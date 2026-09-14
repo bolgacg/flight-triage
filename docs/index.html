@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Which of these flights was already in trouble?</title>
+<meta name="description" content="A preregistered study of 1,600 public PX4 flight logs: can a fixed rule, reading the log alone, find the flights that crashed for a hardware or software reason, without burying the reader in false alarms? Bolgac Gulen, 2026.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#faf9f7;--ink:#1a1d21;--soft:#5b6470;--faint:#8b95a1;--rule:#e2e0dc;--rule2:#c9c5be;--panel:#f3f1ed;--card:#fff;
+  --pos:#2f7d54;--neg:#b03a3a;--accent:#2c4a6b;--amber:#c8860d;--s1:#2a78d6;--s2:#eb6834;
+  --serif:'Newsreader',Georgia,serif;--sans:'IBM Plex Sans',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.6;padding-bottom:110px}
+a{color:var(--accent);text-decoration:none;font-weight:500}a:hover{text-decoration:underline}
+.wrap{max-width:960px;margin:0 auto;padding:0 20px}
+header{padding:48px 0 30px;border-bottom:1px solid var(--ink)}
+.eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;color:var(--faint);text-transform:uppercase}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(32px,5vw,52px);line-height:1.08;letter-spacing:-.01em;margin:12px 0 14px;max-width:820px;text-wrap:balance}
+.dek{max-width:760px;color:var(--soft);font-size:18.5px;font-family:var(--serif);line-height:1.5}
+.dek strong{color:var(--ink);font-weight:600}
+.byline{margin-top:16px;font-family:var(--mono);font-size:12px;color:var(--faint);display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center}
+section{padding:44px 0 6px}
+.sec-label{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+h2{font-family:var(--serif);font-weight:600;font-size:29px;line-height:1.2;margin-bottom:10px;text-wrap:balance}
+h3{font-family:var(--serif);font-size:20px;font-weight:600}
+p{margin-bottom:12px}
+.lede{color:var(--soft);max-width:760px;margin-bottom:20px}
+.lede strong,.lede em{color:var(--ink)}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:22px 24px;margin-top:16px}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:12px;padding:6px 12px;border:1px solid var(--rule2);border-radius:3px;background:var(--card);color:var(--soft);cursor:pointer}
+.chip:hover{color:var(--ink);border-color:var(--soft)}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper);font-weight:500}
+.viz{position:relative}.viz svg{width:100%;height:auto;display:block}
+.tip{position:absolute;pointer-events:none;background:var(--ink);color:var(--paper);font:12px var(--mono);padding:6px 8px;border-radius:4px;display:none;white-space:nowrap;z-index:5}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--soft);margin:6px 0 0 4px;flex-wrap:wrap}
+.legend span{display:inline-flex;align-items:center;gap:6px}.legend i{width:16px;height:0;border-top:2px solid;display:inline-block}
+.legend i.bar{height:10px;border:0;width:12px}
+.verdict{margin-top:16px;padding:2px 0 2px 16px;border-left:3px solid var(--accent);font-size:15px;max-width:760px}
+.verdict.sting{border-left-color:var(--neg)}.verdict b{color:var(--accent)}.verdict.sting b{color:var(--neg)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);text-align:right;padding:0 0 8px;border-bottom:1px solid var(--rule)}
+th:first-child{text-align:left}
+td{padding:8px 0;border-bottom:1px solid var(--rule);text-align:right;font-variant-numeric:tabular-nums;vertical-align:top}
+td:first-child{text-align:left}td.l{text-align:left}th+th,td+td{padding-left:14px}td.num{white-space:nowrap}
+tr:last-child td{border-bottom:none}
+.tscroll{overflow-x:auto}
+.note{font-size:12.5px;color:var(--faint);margin-top:10px;line-height:1.5}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.hint{font-size:12px;color:var(--faint);line-height:1.45}
+code{font-family:var(--mono);font-size:12.5px}
+.quote{font-family:var(--serif);font-size:17px;color:var(--ink);border-left:3px solid var(--amber);padding:2px 0 2px 16px;margin:14px 0;max-width:760px}
+.quote small{display:block;font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:6px}
+.limits{margin-top:22px;border-left:3px solid var(--neg);padding:2px 0 2px 16px;max-width:760px}
+.limits p{font-size:14px;color:var(--soft)}
+.small{font-size:13.5px;color:var(--soft)}
+.gloss{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px 24px;font-size:13px;color:var(--soft);margin-top:10px}
+.gloss b{color:var(--ink);font-family:var(--mono);font-size:12px;font-weight:500}
+footer{border-top:1px solid var(--rule);margin-top:44px;padding:20px 0 30px;font-family:var(--mono);font-size:12px;color:var(--faint)}
+footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+#tour{position:absolute;top:0;left:0;right:0;z-index:50;display:none;pointer-events:none}
+#tour.on{display:block}
+.tour-hl{position:absolute;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 9999px rgba(26,29,33,.55);transition:all .35s ease;pointer-events:none}
+.tour-card{position:absolute;width:min(400px,calc(100vw - 32px));background:var(--card);border:1px solid var(--rule2);border-radius:8px;padding:18px 20px;box-shadow:0 6px 30px rgba(0,0,0,.18);pointer-events:auto}
+.tour-card .tk{font-family:var(--mono);font-size:10px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.tour-card p{font-size:14px;line-height:1.55;color:var(--ink);margin:0 0 12px}
+.tour-nav{display:flex;align-items:center;gap:8px}
+.tour-nav .dots{flex:1;display:flex;gap:5px}
+.tour-nav .dots i{width:6px;height:6px;border-radius:50%;background:var(--rule2)}
+.tour-nav .dots i.on{background:var(--accent)}
+.tour-btn{font-family:var(--mono);font-size:12px;padding:7px 14px;border-radius:4px;border:1px solid var(--rule2);background:var(--card);color:var(--soft);cursor:pointer}
+.tour-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.tour-open{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:4px;border:1px solid var(--accent);background:var(--card);color:var(--accent);cursor:pointer}
+.tour-open:hover{background:var(--accent);color:#fff}
+.stat{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0;background:var(--panel);border:1px solid var(--rule);border-radius:6px;overflow:hidden;margin-top:14px}
+.stat>div{padding:12px 14px;border-left:1px solid var(--rule)}.stat>div:first-child{border-left:none}
+.stat .k{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin-bottom:4px}
+.stat .n{font-family:var(--mono);font-size:20px;font-weight:500}.stat .s{font-size:11.5px;color:var(--soft);margin-top:3px}
+.howto{font-size:13px;color:var(--soft);margin:8px 0 0;line-height:1.5}
+.howto b{color:var(--ink);font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;margin-right:6px}
+.card-title{font-family:var(--serif);font-size:20px;font-weight:600;margin-bottom:4px}
+.pill{display:inline-block;font-family:var(--mono);font-size:9.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;border:1px solid var(--rule2);border-radius:3px;padding:3px 7px;color:var(--soft);white-space:nowrap;margin-left:6px}
+.pill.bad{color:var(--neg);border-color:var(--neg)}
+.pill.ok{color:var(--pos);border-color:var(--pos)}
+.pill.mid{color:var(--amber);border-color:var(--amber)}
+.why{font-size:14.5px;color:var(--ink);background:var(--panel);border-radius:4px;padding:10px 14px;margin:0 0 12px}
+.why b{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-right:6px}
+.qgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px 22px;margin:18px 0 6px;max-width:880px}
+.qgrid div{border-top:1px solid var(--rule);padding-top:8px;font-size:14.5px;line-height:1.5;color:var(--soft)}
+.qgrid b{display:block;font-family:var(--serif);font-size:17px;color:var(--ink);font-weight:600;margin-bottom:2px}
+@media (max-width:640px){.qgrid{grid-template-columns:1fr}}
+.slider{width:100%;max-width:520px;accent-color:var(--accent)}
+.rowsel{cursor:pointer}
+.rowsel:hover td{background:var(--panel)}
+tr.on td{background:#eef2f7}
+.mono{font-family:var(--mono)}
+.flex{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+.grow{flex:1;min-width:280px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="tour"><div class="tour-hl"></div><div class="tour-card"></div></div>
+
+<header><div class="wrap">
+  <div class="eyebrow">Work sample &middot; for SDU Drone Center &middot; September 2026</div>
+  <h1>Which of these flights was already in trouble?</h1>
+  <p class="dek" id="dek">Loading the study.</p>
+  <div class="byline">
+    <span>Bolga&ccedil; G&uuml;len</span>
+    <span>Public PX4 log database</span>
+    <a href="https://github.com/bolgacg/flight-triage">github.com/bolgacg/flight-triage</a>
+    <button class="tour-open" id="tourbtn">Walk me through it</button>
+  </div>
+</div></header>
+
+<section id="primer"><div class="wrap">
+  <div class="sec-label">Before anything else</div>
+  <h2>Five things to know</h2>
+  <p class="lede">This page is about flight logs, so here is what a flight log is and what is being
+  counted, in five sentences. Nothing after this assumes you have seen one.</p>
+  <div class="card">
+    <ol class="small" style="padding-left:18px;line-height:1.75">
+      <li>Every flight of a drone running the open-source PX4 autopilot writes a <b>log</b>: a few
+        hundred thousand rows recording what the sensors measured, what the controller asked for and
+        what the aircraft did, several hundred times a second.</li>
+      <li>Pilots upload those logs to a public database, <a href="https://review.px4.io">review.px4.io</a>,
+        to get plots back. It now holds <span id="p-total">463,000</span> public flights.</li>
+      <li>When they upload, some of them rate the flight. <b>Crash, software or hardware</b> means the
+        aircraft or its code failed. <b>Crash, pilot</b> means they flew it into something.
+        <b>Good</b> and <b>great</b> mean it came home fine. Those ratings are the only human
+        judgement used on this page.</li>
+      <li>From each log this study computes <b>indicators</b>: one number per flight for vibration,
+        for how often the position estimator refused to believe a sensor, for how far the aircraft
+        lagged the commands it was given, and so on. Higher always means more worrying.</li>
+      <li>An <b>indicator</b> only earns its place if, at a fixed tolerance for false alarms, it
+        finds crashed aircraft more often than the check the autopilot already runs by itself.</li>
+    </ol>
+  </div>
+
+  <div class="card" id="domain">
+    <div class="card-title">What happens to one log</div>
+    <p class="small">The whole study in one picture. Read left to right.</p>
+    <div class="viz" id="domainviz"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Terms, in the order they appear</div>
+    <div class="gloss">
+      <div><b>armed</b> The part of the log where the motors could turn. Everything is measured over
+        that window only, so sitting on a bench does not count.</div>
+      <div><b>indicator</b> One number computed from one flight. Higher means more worrying.</div>
+      <div><b>false alarm</b> A flight the rule flags that the pilot rated good or great.</div>
+      <div><b>detection rate</b> The share of crashed flights the rule flags.</div>
+      <div><b>estimator</b> The software that fuses the sensors into one belief about where the
+        aircraft is. When it rejects a measurement it is saying it does not believe that sensor.</div>
+      <div><b>test ratio</b> The estimator's own measure of how far a sensor reading sat from what it
+        expected. Above 1.0 means rejected.</div>
+      <div><b>failure detector</b> A check PX4 already runs in flight, watching for extreme attitudes,
+        a dead motor and an imbalanced propeller. This study's baseline.</div>
+      <div><b>fit half and measured half</b> Every threshold is chosen on one half of the flights and
+        reported on the other, so no number on this page was tuned to the number beside it.</div>
+    </div>
+  </div>
+</div></section>
+
+<section id="words"><div class="wrap">
+  <div class="sec-label">Their words</div>
+  <h2>Why this page and not another</h2>
+  <p class="lede">This is not a general idea about drones. It answers a gap the centre published
+  about itself six months ago, in the compliance table of its own Kenya operations paper, against
+  the safety objective that asks whether the aircraft are maintained by a competent entity. The
+  objective is marked <b>not met</b>, and the evaluation reads:</p>
+  <div class="quote">No formal maintenance structure exists. There are no documented maintenance
+    instructions, no dedicated maintenance personnel, and no maintenance log or record-keeping
+    system.
+    <small>Maalouf and 21 others including Schultz Lundquist, "SORA 2.5-Guided BVLOS UAS for
+      Wildlife Conservation in Kenya", Drones 2026, 10(3), 178, Table A13, objective 03,
+      published 5 March 2026</small></div>
+  <p class="small">The same campaign flew more than 260 flights and over 60 hours across the Ol
+  Pejeta Conservancy, with post-flight logging listed as one of the few steps applied consistently
+  to every operation. So the logs exist. What does not exist yet is anything that reads them.</p>
+  <div class="quote">currently, drones lack the technological maturity for widespread application in
+    this field; they are often viewed as unreliable, time-consuming, and expensive for use in
+    ecological experiments and conservation efforts.
+    <small>Schultz Lundquist and others, "WildDrone: autonomous drone technology for monitoring
+      wildlife populations", Frontiers in Robotics and AI 12, 12 January 2026</small></div>
+
+  <h3 style="margin-top:24px">The sentence in that paper that argues against this page</h3>
+  <p class="small">Their own conclusion on where automation pays says the opposite of what a
+  post-flight tool would like to hear, and it belongs here rather than in a footnote:</p>
+  <div class="quote">Its greatest value lies in planning and pre-flight phases [...] packing,
+    inspection, and post-flight tasks remain largely physical and offer limited scope for
+    automation.
+    <small>Same Kenya paper, on the value of automation</small></div>
+  <p class="small">That is true of the physical work, and this page does not touch it. Nobody
+  automates opening an airframe and looking at a motor mount. What is left after the physical work
+  is a folder of logs that were recorded anyway and nobody has time to open, and the question of
+  which ones deserve an hour. That question is arithmetic, and arithmetic is what this page does.</p>
+
+  <p class="small">Two more things make the format the right one. The centre's most active public
+  repository, <a href="https://github.com/SDU-UAS-Center/lyrebird">lyrebird</a>, exists to make its
+  DJI aircraft speak "MAVLink 2 on by default, reporting as PX4", so the log shape this page reads
+  is the shape their own bridge was built to produce. And the centre wrote a flight-log reader once
+  before, <a href="https://github.com/SDU-UAS-Center/AQ-LogReader">AQ-LogReader</a>, and left it in
+  2017.</p>
+  <p class="note">Stated plainly, because it matters for how the page is read: the Kenya fleet was
+  mostly DJI with ArduPilot on the custom builds, and that paper does not mention PX4. The claim
+  here is not that the centre flies PX4 as standard. It is that PX4 and MAVLink logs are the format
+  its own tooling converges on, and that the arithmetic below transfers to any log with the same
+  signals in it.</p>
+</div></section>
+
+<section id="act1"><div class="wrap">
+  <div class="sec-label">Act one</div>
+  <h2>One flight, read by the rule</h2>
+  <p class="why"><b>Why this matters</b> Before any rate means anything, you have to see what a
+  number like "vibration, 10.5" is made of, and what the same number looks like on a flight that
+  came home fine.</p>
+  <p class="lede">Each of these is a real public flight. The charts are computed from the log,
+  one point per second of armed flight. The rating underneath is what the pilot wrote after
+  landing, or after picking up the pieces.</p>
+  <div class="chips" id="exchips" role="group" aria-label="Choose a flight"></div>
+  <p class="howto"><b>Click</b> a flight above. The charts and the indicator readout change with it.</p>
+  <div class="card" id="excard"></div>
+  <div class="verdict" id="v1"></div>
+</div></section>
+
+<section id="act2"><div class="wrap">
+  <div class="sec-label">Act two</div>
+  <h2>A week of logs, in the order a person should read them</h2>
+  <p class="why"><b>Why this matters</b> The job is not to classify one flight. It is to put a pile
+  of logs in an order, so the first ten a person opens are the ten worth opening.</p>
+  <p class="lede">Every flight in the measured half, sorted by how many indicators sit above their
+  threshold. The rating column is hidden until you ask for it, because that is the situation a
+  centre is actually in: the logs arrive, and nobody has said yet which ones went wrong.</p>
+  <div class="chips" id="queuechips" role="group" aria-label="Queue controls"></div>
+  <p class="howto"><b>Click</b> a row to see that flight's indicators. <b>Reveal</b> turns on the
+  column showing what the pilot said, so you can check the order against the truth.</p>
+  <div class="card">
+    <div class="tscroll"><table id="queuetable"><thead></thead><tbody></tbody></table></div>
+    <div id="queuedetail" class="small" style="margin-top:14px"></div>
+  </div>
+  <div class="verdict" id="v2"></div>
+</div></section>
+
+<section id="act3"><div class="wrap">
+  <div class="sec-label">Act three</div>
+  <h2>What one false alarm in ten is worth</h2>
+  <p class="why"><b>Why this matters</b> A rule that flags everything finds every crash and is
+  useless. The only honest way to compare rules is to give them the same tolerance for false alarms
+  and see what each one finds.</p>
+  <p class="lede">Every threshold on this page is set on the fit half so that the rule flags a fixed
+  share of flights the pilot called good. That share is the budget. The preregistered budget is one
+  in ten; the slider shows the rest of the family, and those other points were not fixed in advance.</p>
+  <div class="card" id="budgetcard">
+    <label class="small" for="bslider"><b>False alarm budget:</b>
+      <span class="num" id="blabel">10%</span> of healthy flights flagged</label>
+    <input class="slider" type="range" id="bslider" min="0" max="44" value="0">
+    <p class="hint">Drag it. Left is a stricter rule that misses more; right is a noisier rule that
+      catches more. The preregistered answer is the notch at 10 percent.</p>
+    <div class="viz" id="budgetviz"></div>
+    <div class="legend" id="budgetlegend"></div>
+  </div>
+  <div class="stat" id="budgetstat"></div>
+  <div class="verdict" id="v3"></div>
+</div></section>
+
+<section id="act4"><div class="wrap">
+  <div class="sec-label">Act four</div>
+  <h2>The test this page could have failed</h2>
+  <p class="why"><b>Why this matters</b> A rule that flags every flight that ended badly is not
+  reading the machine, it is reading the outcome. The cohort contains a group that separates the
+  two, and it was chosen before any of this was computed.</p>
+  <p class="lede">Some pilots rated their crash as their own fault. On those flights the aircraft may
+  have been perfectly healthy right up to the moment it met the ground. An indicator that measures
+  machine health should do clearly worse there than on hardware and software failures. If it does
+  just as well on both, it is detecting bad endings, not bad aircraft.</p>
+  <div class="viz" id="falsviz"></div>
+  <div class="legend" id="falslegend"></div>
+  <div class="verdict" id="v4"></div>
+
+  <h3 style="margin-top:28px">Where each indicator actually stands</h3>
+  <p class="small">Every indicator, at the preregistered budget, measured on the half of the flights
+  that chose none of the thresholds. Coverage is the share of flights whose logs carried what the
+  indicator needs; a low number there is a limitation, not a result.</p>
+  <div class="tscroll"><table id="indtable"><thead></thead><tbody></tbody></table></div>
+  <div class="verdict sting" id="v5"></div>
+</div></section>
+
+<section id="coda"><div class="wrap">
+  <div class="sec-label">How it was built</div>
+  <h2>Method, limits and sources</h2>
+
+  <h3>The split, and why it is there</h3>
+  <p class="small">Every flight was put in one of two halves by the first hexadecimal digit of the
+  md5 hash of its log id: even chooses thresholds, odd reports them. Nothing about the flight's
+  contents or its rating enters that decision. The fit half is where each indicator's threshold was
+  set so that it flags the budgeted share of healthy flights. The measured half was read once, after
+  the rules were fixed, and every later read of it is listed in
+  <a href="https://github.com/bolgacg/flight-triage/blob/main/PREREGISTRATION.md">PREREGISTRATION.md</a>.</p>
+
+  <h3>The cohort</h3>
+  <p class="small" id="cohorttext"></p>
+
+  <h3>What the numbers are made of</h3>
+  <p class="small">The logs in this cohort span PX4 v1.6 to v1.16, roughly a decade of firmware, and
+  the topics available changed several times over that period. So the first tier of indicators is
+  computed here from raw signals every generation records: the accelerometer, the estimator's own
+  test ratios, the rate the controller asked for against the rate the airframe produced, the battery
+  voltage and current, and the satellite fix. Vibration, for example, is the accelerometer magnitude
+  minus its half-second rolling mean, reported as the 95th percentile of the per-second standard
+  deviation of what is left. The second tier exists only on newer firmware and includes the
+  autopilot's own failure detector, which is the baseline every first-tier indicator has to beat.</p>
+  <p class="small" id="agreetext"></p>
+
+  <div class="limits">
+    <h3>Limits, stated before you find them</h3>
+    <p id="limits1"></p>
+    <p id="limits2"></p>
+    <p>The ratings are what the uploader chose, not an investigation. A pilot who blames themselves
+      may be wrong, and a pilot who blames the aircraft may be wrong in the other direction. The
+      groups are noisy in a way that no amount of computation fixes.</p>
+    <p>The cohort is drawn from flights people chose to upload, which is not a random sample of
+      flying. Logs from a bad day are more likely to be uploaded than logs from an ordinary one.</p>
+    <p>Nothing here is a maintenance recommendation. The page ranks logs for a human to open; it
+      does not say a part is failing, and it has no access to what was actually found afterwards.</p>
+  </div>
+
+  <h3 style="margin-top:26px">Sources</h3>
+  <ul class="small" style="padding-left:18px;line-height:1.8">
+    <li>Public log index, <a href="https://review.px4.io/dbinfo">review.px4.io/dbinfo</a>, read 14 September 2026.
+      Logs themselves from <code>cdn.logs.px4.io</code>.</li>
+    <li>Log parsing with <a href="https://github.com/PX4/pyulog">pyulog</a>. The error-label
+      taxonomy is the one Flight Review itself offers on a log page.</li>
+    <li>Job advertisement 4209, SDU Drone Center, read 20 August 2026.</li>
+    <li>Code and the registration: <a href="https://github.com/bolgacg/flight-triage">github.com/bolgacg/flight-triage</a>.</li>
+  </ul>
+</div></section>
+
+<footer><div class="wrap">
+  <span>Bolga&ccedil; G&uuml;len &middot; every number on this page is generated by the build script from the logs named above, not typed</span>
+  <a href="https://github.com/bolgacg/flight-triage">github.com/bolgacg/flight-triage</a>
+</div></footer>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

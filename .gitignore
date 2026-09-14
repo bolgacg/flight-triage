@@ -1,0 +1,4 @@
+data/dbinfo.json.gz
+data/*.ulg
+data/shots/
+data/features.log
