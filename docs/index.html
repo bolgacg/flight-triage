@@ -173,19 +173,24 @@ tr.on td{background:#eef2f7}
 <section id="words"><div class="wrap">
   <div class="sec-label">Their words</div>
   <h2>Why this page and not another</h2>
-  <p class="lede">This is not a general idea about drones. It answers a gap the centre published
-  about itself six months ago, in the compliance table of its own Kenya operations paper, against
-  the safety objective that asks whether the aircraft are maintained by a competent entity. The
-  objective is marked <b>not met</b>, and the evaluation reads:</p>
+  <p class="lede">This page answers a gap the centre published about itself six months ago. In the
+  compliance table of its Kenya operations paper, against the safety objective asking whether the
+  aircraft are maintained by a competent entity, the objective is marked <b>not met</b>, and the
+  evaluation reads:</p>
   <div class="quote">No formal maintenance structure exists. There are no documented maintenance
     instructions, no dedicated maintenance personnel, and no maintenance log or record-keeping
-    system.
+    system. Maintenance procedures, staff responsibilities, and training records will be
+    established before future operations.
     <small>Maalouf and 21 others including Schultz Lundquist, "SORA 2.5-Guided BVLOS UAS for
-      Wildlife Conservation in Kenya", Drones 2026, 10(3), 178, Table A13, objective 03,
-      published 5 March 2026</small></div>
-  <p class="small">The same campaign flew more than 260 flights and over 60 hours across the Ol
-  Pejeta Conservancy, with post-flight logging listed as one of the few steps applied consistently
-  to every operation. So the logs exist. What does not exist yet is anything that reads them.</p>
+      Wildlife Conservation in Kenya: Reducing Friction Between Safety and Field Operations",
+      Drones 2026, 10(3), 178, Table A13, objective 03, published 5 March 2026.
+      <a href="https://doi.org/10.3390/drones10030178">doi.org/10.3390/drones10030178</a></small></div>
+  <p class="small">The last sentence is the one that makes this worth building. They are not
+  saying records do not matter; they are saying records are the next thing to put in place.</p>
+  <p class="small">The same campaign flew "over 260 flights and more than 60 h of UAS activity
+  across the Ol Pejeta Conservancy", with post-flight logging listed as one of the few steps
+  applied consistently to every operation. So the logs exist. What does not exist yet, by their own
+  account, is anything that reads them.</p>
   <div class="quote">currently, drones lack the technological maturity for widespread application in
     this field; they are often viewed as unreliable, time-consuming, and expensive for use in
     ecological experiments and conservation efforts.
@@ -207,9 +212,9 @@ tr.on td{background:#eef2f7}
   <p class="small">Two more things make the format the right one. The centre's most active public
   repository, <a href="https://github.com/SDU-UAS-Center/lyrebird">lyrebird</a>, exists to make its
   DJI aircraft speak "MAVLink 2 on by default, reporting as PX4", so the log shape this page reads
-  is the shape their own bridge was built to produce. And the centre wrote a flight-log reader once
-  before, <a href="https://github.com/SDU-UAS-Center/AQ-LogReader">AQ-LogReader</a>, and left it in
-  2017.</p>
+  is the shape their own bridge was built to produce. And the centre has written a log reader
+  before: <a href="https://github.com/SDU-UAS-Center/AQ-LogReader">AQ-LogReader</a>, for the
+  AutoQuad boards it flew in 2017.</p>
   <p class="note">Stated plainly, because it matters for how the page is read: the Kenya fleet was
   mostly DJI with ArduPilot on the custom builds, and that paper does not mention PX4. The claim
   here is not that the centre flies PX4 as standard. It is that PX4 and MAVLink logs are the format
@@ -286,6 +291,17 @@ tr.on td{background:#eef2f7}
   <div class="legend" id="falslegend"></div>
   <div class="verdict" id="v4"></div>
 
+  <div id="cutblock" hidden>
+    <h3 style="margin-top:30px">Now hide the ending</h3>
+    <p class="small">Every flight here ends on the ground one way or another, and an impact writes
+    vibration and tracking error into the log whatever caused it. So the whole study was run a
+    second time on the same flights with the last seconds before the end thrown away. If the rule
+    still finds crashed aircraft with the ending hidden, it is reading trouble rather than reading
+    the landing.</p>
+    <div class="tscroll"><table id="cuttable"><thead></thead><tbody></tbody></table></div>
+    <div class="verdict" id="v6"></div>
+  </div>
+
   <h3 style="margin-top:28px">Where each indicator actually stands</h3>
   <p class="small">Every indicator, at the preregistered budget, measured on the half of the flights
   that chose none of the thresholds. Coverage is the share of flights whose logs carried what the
@@ -306,6 +322,13 @@ tr.on td{background:#eef2f7}
   the rules were fixed, and every later read of it is listed in
   <a href="https://github.com/bolgacg/flight-triage/blob/main/PREREGISTRATION.md">PREREGISTRATION.md</a>.</p>
 
+  <div class="card" id="modelcard">
+    <div class="card-title">What was fitted, in one box</div>
+    <p class="small">Nothing here is a trained network. What was fitted is a set of thresholds,
+    and a threshold fitted to data is still a model, so it gets the same card.</p>
+    <div class="tscroll"><table><tbody id="modelcardbody"></tbody></table></div>
+  </div>
+
   <h3>The cohort</h3>
   <p class="small" id="cohorttext"></p>
 
@@ -324,6 +347,7 @@ tr.on td{background:#eef2f7}
     <h3>Limits, stated before you find them</h3>
     <p id="limits1"></p>
     <p id="limits2"></p>
+    <p id="limits3"></p>
     <p>The ratings are what the uploader chose, not an investigation. A pilot who blames themselves
       may be wrong, and a pilot who blames the aircraft may be wrong in the other direction. The
       groups are noisy in a way that no amount of computation fixes.</p>

@@ -23,6 +23,13 @@
     if (a >= 0.01) return x.toFixed(3);
     return x.toExponential(1);
   }
+  var RATING_NAME = {
+    crash_sw_hw: 'a crash caused by hardware or software',
+    crash_pilot: 'a crash they blamed on themselves',
+    unsatisfactory: 'unsatisfactory',
+    good: 'good',
+    great: 'great'
+  };
   var GROUP_NAME = {
     case: 'crashed, hardware or software',
     control: 'came home fine',
@@ -72,10 +79,19 @@
   function tierOneNames() {
     return Object.keys(D.indicators).filter(function (n) { return D.indicators[n].tier === 1; });
   }
-  function above(name, v) {
-    var t = D.combined.thresholds[name];
+  // Two different thresholds are in play and they are not interchangeable. The
+  // per-indicator one answers "is this indicator on its own over its line".
+  // The combining rule's one is looser and only means something as part of the
+  // count the rule uses.
+  function overLine(name, v, t) {
     if (v == null || t == null) return false;
     return D.indicators[name].direction === 'high' ? v > t : v < t;
+  }
+  function above(name, v) {
+    return overLine(name, v, D.indicators[name] ? D.indicators[name].threshold : null);
+  }
+  function ruleThresholds() {
+    return (D.combined_k && D.combined_k.thresholds) || D.combined.thresholds || {};
   }
   function lineChart(host, series, colour) {
     var W = 860, H = 132, P = { l: 46, r: 10, t: 26, b: 24 };
@@ -112,7 +128,7 @@
     var q = (D.queue || []).filter(function (r) { return r.log_id === e.log_id; })[0] || {};
     var head = '<div class="card-title">' + (e.airframe_name || e.mav_type || 'Flight') + ', ' + (e.log_date || '') + '</div>';
     head += '<p class="small">PX4 ' + ((e.ver_sw_release || '').split(' ')[0] || 'unknown firmware') +
-      '. The pilot rated it <b>' + (e.rating || 'nothing') + '</b>' +
+      '. The pilot rated it <b>' + (RATING_NAME[e.rating] || e.rating || 'nothing') + '</b>' +
       (e.error_label_names && e.error_label_names.length ? ' and a reviewer labelled it ' + e.error_label_names.join(', ') : '') +
       '. <a href="' + e.review_url + '">See it on Flight Review</a>.</p>';
     card.innerHTML = head;
@@ -154,8 +170,8 @@
   /* ---------- act two: the queue ---------- */
   var reveal = false, qsel = null, qsort = 'hits';
   function hits(r) {
-    var n = 0;
-    tierOneNames().forEach(function (k) { if (above(k, r[k])) n++; });
+    var n = 0, thr = ruleThresholds();
+    tierOneNames().forEach(function (k) { if (overLine(k, r[k], thr[k])) n++; });
     return n;
   }
   function renderQueue() {
@@ -206,11 +222,15 @@
     var det = $('#queuedetail');
     var sel = rows.filter(function (r) { return r.log_id === qsel; })[0];
     if (!sel) { det.innerHTML = '<span class="hint">Click a row to see everything the rule read from that flight.</span>'; return; }
+    var thr = ruleThresholds();
     var lines = Object.keys(D.indicators).map(function (n) {
       var v = sel[n]; if (v == null) return null;
+      var inRule = thr[n] != null;
       return '<tr><td class="l">' + D.indicators[n].label + (D.indicators[n].tier === 2 ? ' <span class="pill">newer firmware</span>' : '') +
         '</td><td class="num">' + sig(v) + ' ' + D.indicators[n].unit + '</td><td>' +
-        (above(n, v) ? '<span class="pill bad">over</span>' : '<span class="pill ok">under</span>') + '</td></tr>';
+        (!inRule ? '<span class="pill">not in the rule</span>'
+          : overLine(n, v, thr[n]) ? '<span class="pill bad">counts against it</span>'
+            : '<span class="pill ok">clear</span>') + '</td></tr>';
     }).filter(Boolean).join('');
     det.innerHTML = '<b>' + sel.log_id.slice(0, 8) + '</b>, ' + (sel.airframe || sel.mav_type) + ', PX4 ' + (sel.firmware || '?') +
       ', ' + Math.round(sel.armed_s || 0) + ' seconds armed, ' + (sel.logged_errors || 0) + ' errors written by the autopilot itself' +
@@ -326,6 +346,35 @@
     $('#falslegend').innerHTML = '<span class="hint">The bar for pilot-error crashes is the one to watch. If it matched the top bar, the rule would be reading outcomes rather than aircraft.</span>';
   }
 
+  /* ---------- act four: the same rule with the ending hidden ---------- */
+  function renderTailCut() {
+    var block = $('#cutblock');
+    if (!block || !D.cut || !D.cut.combined_k) return;
+    var half = D.fit_only ? 'fit' : 'measure';
+    var full = (D.combined_k && (D.combined_k[half] || D.combined_k.fit)) || D.combined[half] || D.combined.fit;
+    var cut = D.cut.combined_k[half] || D.cut.combined_k.fit;
+    if (!full || !cut) return;
+    block.hidden = false;
+    var t = $('#cuttable');
+    $('thead', t).innerHTML = '<tr><th>Group</th><th>Whole flight</th><th>Last ' + D.cut.tail_cut + ' seconds hidden</th><th>Change</th></tr>';
+    $('tbody', t).innerHTML = ['case', 'pilot', 'poor', 'control'].map(function (g) {
+      var a = full[g], b = cut[g];
+      if (!a || !b || a.rate == null || b.rate == null) return '';
+      var d = b.rate - a.rate;
+      return '<tr><td class="l">' + GROUP_NAME[g] + '</td><td class="num">' + pct(a.rate) + ' <span class="hint">(' + a.n + ')</span>' +
+        '</td><td class="num">' + pct(b.rate) + ' <span class="hint">(' + b.n + ')</span>' +
+        '</td><td class="num ' + (Math.abs(d) < 0.03 ? '' : d < 0 ? 'neg' : 'pos') + '">' +
+        (d >= 0 ? '+' : '') + (100 * d).toFixed(0) + ' points</td></tr>';
+    }).join('');
+    var keptShare = full.case.rate ? cut.case.rate / full.case.rate : 0;
+    $('#v6').innerHTML = '<b>With the ending hidden the rule keeps ' + pct(keptShare) + ' of what it found.</b> ' +
+      'It flags ' + pct(cut.case.rate) + ' of hardware and software crashes against ' + pct(cut.pilot.rate) +
+      ' of pilot-error crashes, at ' + pct(cut.control.rate) + ' of healthy flights. ' +
+      (cut.case.rate - cut.pilot.rate > 0.08
+        ? 'The gap between the two crash groups survives, which is the evidence that the indicators are reading the aircraft and not the impact.'
+        : 'The gap between the two crash groups does not survive, so on this evidence the rule is reading flights that ended badly rather than aircraft in trouble, and the claim at the top of the page should be read with that in mind.');
+  }
+
   /* ---------- the indicator table ---------- */
   function renderIndicators() {
     var t = $('#indtable'); if (!t) return;
@@ -406,6 +455,37 @@
       Math.round(100 * (D.tiers.modern.case + D.tiers.modern.control) / Math.max(1, D.tiers.modern.case + D.tiers.modern.control + D.tiers.legacy.case + D.tiers.legacy.control)) +
       ' percent of the cohort, and the table above shows each one’s coverage next to its result.';
     $('#limits2').textContent = 'The false alarm budget is a choice, not a fact. It was fixed at one in ten before the measured half was read, and every other point on the slider was produced afterwards.';
+    var mcb = $('#modelcardbody');
+    if (mcb) {
+      var nFit = n.case.fit + n.control.fit, nMeas = n.case.measure + n.control.measure;
+      var card = [
+        ['What it predicts', 'Whether a flight will have been rated a crash caused by hardware or software. It is a ranking, not a diagnosis, and it names no part.'],
+        ['What it reads', tierOneNames().length + ' numbers per flight, computed from the log over the armed window only: ' +
+          tierOneNames().map(function (k) { return D.indicators[k].label; }).join('; ') + '.'],
+        ['Free parameters', D.combined_k
+          ? 'Three. One quantile shared by all eight thresholds, and the count of indicators that must agree, for the exploratory rule; one quantile for the rule registered in advance.'
+          : 'One. A single quantile shared by all eight thresholds.'],
+        ['Fitted on', nFit + ' flights in the fit half (' + n.case.fit + ' crashes, ' + n.control.fit + ' healthy). Thresholds are set so the rule flags ' + pct(D.false_alarm_budget) + ' of the healthy ones.'],
+        ['Scored on', nMeas + ' flights in the measured half, read once, after the rules were fixed.'],
+        ['Performance', pct(comb.case.rate) + ' of crashes found (95% interval ' + pct(comb.case.lo) + ' to ' + pct(comb.case.hi) + '), at ' + pct(comb.control.rate) + ' of healthy flights flagged.'],
+        ['Against doing nothing clever', 'PX4’s own failure detector finds ' + pct(bl.case.rate) + ' on the flights whose firmware carries it. Flagging any flight where the autopilot wrote an error finds ' +
+          pct(((D.baselines['logged_errors_' + half] || {}).case || {}).rate) + ' at ' + pct(((D.baselines['logged_errors_' + half] || {}).control || {}).rate) + ' of healthy flights.'],
+        ['Verdict', comb.case.rate > (bl.case.rate || 0) + 0.05
+          ? 'Better than both baselines at the same tolerance for false alarms, and far from perfect: most crashes still look ordinary in the log.'
+          : 'Not clearly better than the check the autopilot already runs, which is the honest reading of these numbers.']
+      ];
+      mcb.innerHTML = card.map(function (r) {
+        return '<tr><td class="l" style="width:190px"><b>' + r[0] + '</b></td><td class="l">' + r[1] + '</td></tr>';
+      }).join('');
+    }
+    if (D.availability && D.availability.case && D.availability.control) {
+      var av = D.availability;
+      $('#agreetext').innerHTML = ($('#agreetext').innerHTML || '') +
+        ' A rule that counts indicators is only fair if every group carries about the same number of them, so that was checked rather than assumed: a crashed flight carries ' +
+        av.case.mean_present + ' of the ' + av.case.of + ' first-tier indicators on average, a healthy one ' +
+        av.control.mean_present + ', and a pilot-error crash ' + (av.pilot ? av.pilot.mean_present : 'n/a') + '.';
+    }
+    $('#limits3').textContent = 'Two of the battery numbers are weak and the page does not pretend otherwise. Some packs report the wrong cell count, which makes the lowest cell voltage come out at a value no lithium cell can have, so readings outside 2.0 to 4.6 volts are dropped as unusable rather than believed. Internal resistance, fitted from voltage against current, separates crashed flights from healthy ones barely at all.';
   }
 
   /* ---------- the walkthrough ---------- */
@@ -413,13 +493,14 @@
     var root = $('#tour'), hl = $('.tour-hl', root), card = $('.tour-card', root), idx = 0;
     var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     var STEPS = [
-      { sel: 'header h1', k: 'Welcome · 1 of 7', html: 'This page asks one question about flight logs: <b>can a fixed rule, reading the log alone, tell you which flights were already in trouble?</b> The numbers come from about sixteen hundred public PX4 flights, and every threshold was set on one half and reported on the other.' },
-      { sel: '#domain', k: 'The shape of it · 2 of 7', html: 'One flight becomes a handful of numbers, the numbers become a queue, and only at the very end does a human rating appear, to check whether the queue was in a useful order.' },
-      { sel: '#excard', k: 'One flight · 3 of 7', html: 'A real public flight, second by second. <b>Click the buttons above the charts</b> to move between a crash and a flight that came home. The table underneath shows what the rule read and which thresholds it crossed.' },
-      { sel: '#queuetable', k: 'The queue · 4 of 7', html: 'The same rule applied to every flight in the measured half, sorted so the most worrying sit at the top. <b>Click Reveal</b> to turn on the column showing what the pilot said, and check the order against it.' },
-      { sel: '#budgetcard', k: 'The trade · 5 of 7', html: 'Every rule can be made to catch more by flagging more. <b>Drag the slider</b> to change how many healthy flights you are willing to see flagged, and watch what the rule finds. The dots are the checks that already exist.' },
-      { sel: '#falsviz', k: 'The honest test · 6 of 7', html: 'Crashes the pilot blamed on themselves are the falsification group. If the rule flagged those as often as hardware failures, it would be reading bad endings rather than bad aircraft, and the page would say so.' },
-      { sel: '#indtable', k: 'What fails · 7 of 7', html: 'Every indicator, including the ones that do not work. The weakest is named in the sentence below the table rather than dropped from it.' }
+      { sel: 'header h1', k: 'Welcome · 1 of 8', html: 'This page asks one question about flight logs: <b>can a fixed rule, reading the log alone, tell you which flights were already in trouble?</b> The numbers come from about sixteen hundred public PX4 flights, and every threshold was set on one half and reported on the other.' },
+      { sel: '#domain', k: 'The shape of it · 2 of 8', html: 'One flight becomes a handful of numbers, the numbers become a queue, and only at the very end does a human rating appear, to check whether the queue was in a useful order.' },
+      { sel: '#excard', k: 'One flight · 3 of 8', html: 'A real public flight, second by second. <b>Click the buttons above the charts</b> to move between a crash and a flight that came home. The table underneath shows what the rule read and which thresholds it crossed.' },
+      { sel: '#queuetable', k: 'The queue · 4 of 8', html: 'The same rule applied to every flight in the measured half, sorted so the most worrying sit at the top. <b>Click Reveal</b> to turn on the column showing what the pilot said, and check the order against it.' },
+      { sel: '#budgetcard', k: 'The trade · 5 of 8', html: 'Every rule can be made to catch more by flagging more. <b>Drag the slider</b> to change how many healthy flights you are willing to see flagged, and watch what the rule finds. The dots are the checks that already exist.' },
+      { sel: '#falsviz', k: 'The honest test · 6 of 8', html: 'Crashes the pilot blamed on themselves are the falsification group. If the rule flagged those as often as hardware failures, it would be reading bad endings rather than bad aircraft, and the page would say so.' },
+      { sel: '#cutblock', k: 'Hiding the ending · 7 of 8', html: 'Every flight here ends on the ground, and an impact writes vibration into the log whatever caused it. So the whole study runs a second time with the last seconds thrown away. What survives that is the real claim.' },
+      { sel: '#indtable', k: 'What fails · 8 of 8', html: 'Every indicator, including the ones that do not work. The weakest is named in the sentence below the table rather than dropped from it.' }
     ];
     function place() {
       var st = STEPS[idx], elm = document.querySelector(st.sel);
@@ -467,6 +548,7 @@
     renderExamples();
     renderQueue();
     renderIndicators();
+    renderTailCut();
     fillProse();
     var i0 = nearestBudgetIndex(D.false_alarm_budget);
     var sl = $('#bslider');

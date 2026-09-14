@@ -69,14 +69,24 @@ def _frac(mask: np.ndarray) -> float | None:
 
 
 class Log:
-    """Thin accessor over a parsed ULog, tolerant of missing topics."""
+    """Thin accessor over a parsed ULog, tolerant of missing topics.
 
-    def __init__(self, ulog):
+    `tail_cut` removes that many seconds from the end of the armed window. Every
+    flight in this study ends on the ground one way or another, and an impact
+    writes vibration and tracking error into the log whatever caused it. Cutting
+    the tail asks the sharper question: was the aircraft already in trouble
+    before the ending?
+    """
+
+    def __init__(self, ulog, tail_cut: float = 0.0):
         self.u = ulog
         self.sets: dict[str, list] = {}
         for d in ulog.data_list:
             self.sets.setdefault(d.name, []).append(d)
         self.t0, self.t1 = self._armed_window()
+        self.tail_cut = tail_cut
+        if tail_cut > 0 and self.t1 > self.t0:
+            self.t1 = max(self.t0, self.t1 - tail_cut * 1e6)
 
     def _armed_window(self) -> tuple[float, float]:
         for name, field, want in (
@@ -358,7 +368,7 @@ def indicators(lg: Log) -> dict:
     return f
 
 
-def process(row: dict, keep_dir: str | None = None) -> dict:
+def process(row: dict, keep_dir: str | None = None, tail_cut: float = 0.0) -> dict:
     from pyulog import ULog
 
     log_id = row["log_id"]
@@ -376,8 +386,10 @@ def process(row: dict, keep_dir: str | None = None) -> dict:
         with os.fdopen(fd, "wb") as fh:
             fh.write(payload)
         ulog = ULog(tmp, message_name_filter_list=TOPICS)
-        lg = Log(ulog)
+        lg = Log(ulog, tail_cut=tail_cut)
         rec.update(indicators(lg))
+        if tail_cut:
+            rec["tail_cut_s"] = tail_cut
         rec["topics_present"] = sorted(lg.sets.keys())
         rec["dropouts"] = len(getattr(ulog, "dropouts", []) or [])
         rec["ok"] = True
@@ -399,12 +411,16 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--keep-dir", default="")
     ap.add_argument("--only", default="", help="comma separated log ids")
+    ap.add_argument("--tail-cut", type=float, default=0.0,
+                    help="seconds to drop from the end of the armed window; writes a separate file")
     args = ap.parse_args()
+
+    out_path = OUT if not args.tail_cut else DATA / f"features_cut{int(args.tail_cut)}.jsonl"
 
     cohort = json.loads((DATA / "cohort.json").read_text())["flights"]
     done: set[str] = set()
-    if OUT.exists():
-        for line in OUT.read_text().splitlines():
+    if out_path.exists():
+        for line in out_path.read_text().splitlines():
             if line.strip():
                 try:
                     done.add(json.loads(line)["log_id"])
@@ -427,8 +443,8 @@ def main() -> int:
         return 0
 
     n_ok = n_err = 0
-    with open(OUT, "a") as out, ProcessPoolExecutor(max_workers=args.workers) as pool:
-        futs = {pool.submit(process, r, args.keep_dir or None): r for r in todo}
+    with open(out_path, "a") as out, ProcessPoolExecutor(max_workers=args.workers) as pool:
+        futs = {pool.submit(process, r, args.keep_dir or None, args.tail_cut): r for r in todo}
         for i, fut in enumerate(as_completed(futs), 1):
             rec = fut.result()
             out.write(json.dumps(rec) + "\n")
@@ -439,7 +455,7 @@ def main() -> int:
                 n_err += 1
             if i % 25 == 0 or i == len(todo):
                 print(f"  {i}/{len(todo)}  ok={n_ok} failed={n_err}", flush=True)
-    print(f"done: {n_ok} parsed, {n_err} failed")
+    print(f"done: {n_ok} parsed, {n_err} failed -> {out_path.name}")
     return 0
 
 

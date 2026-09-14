@@ -57,11 +57,11 @@ def wilson(k: int, n: int) -> tuple[float, float]:
     return (max(0.0, (c - h) / d), min(1.0, (c + h) / d))
 
 
-def load() -> list[dict]:
+def load(features: str = "features.jsonl") -> list[dict]:
     cohort = {f["log_id"]: f for f in json.loads((DATA / "cohort.json").read_text())["flights"]}
     rows: list[dict] = []
     seen: set[str] = set()
-    for line in (DATA / "features.jsonl").read_text().splitlines():
+    for line in (DATA / features).read_text().splitlines():
         if not line.strip():
             continue
         try:
@@ -76,6 +76,14 @@ def load() -> list[dict]:
             continue
         row = dict(cohort[lid])
         row.update({k: v for k, v in rec.items() if k != "log_id"})
+        # Validity rule, applied to every group alike: a lithium cell cannot sit
+        # outside roughly 2.0 to 4.6 volts, so a value outside that range means
+        # the pack reported the wrong cell count, not that the cell is unusual.
+        # Those readings are treated as missing rather than as measurements.
+        v = row.get("batt_min_cell_v")
+        if v is not None and not (2.0 <= float(v) <= 4.6):
+            row["batt_min_cell_v"] = None
+            row["_cellv_invalid"] = True
         rows.append(row)
     return rows
 
@@ -126,15 +134,29 @@ def combined_flags(rows: list[dict], thresholds: dict[str, float | None]) -> np.
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--fit-only", action="store_true")
+    ap.add_argument("--tail-cut", type=int, default=0,
+                    help="score the pass that dropped this many seconds from the end of each flight")
     args = ap.parse_args()
 
-    rows = load()
+    features = "features.jsonl" if not args.tail_cut else f"features_cut{args.tail_cut}.jsonl"
+    rows = load(features)
+    if args.tail_cut:
+        # Cutting ten seconds off a twenty second flight leaves too little to
+        # measure, so flights with less than fifteen seconds remaining are left
+        # out of this analysis and the number dropped is reported.
+        before = len(rows)
+        rows = [r for r in rows if (r.get("armed_s") or 0) >= 15.0]
+        print(f"scoring the pass with the last {args.tail_cut} seconds of every flight removed; "
+              f"{before - len(rows)} flights dropped for having under 15 seconds left")
     by = lambda g, s: [r for r in rows if r["group"] == g and (s is None or r["split"] == s)]
 
     counts = {}
     for g in ("case", "control", "pilot", "poor", "labelled"):
         counts[g] = {"fit": len(by(g, "fit")), "measure": len(by(g, "measure")), "total": len(by(g, None))}
     print("parsed flights by group:", {g: c["total"] for g, c in counts.items()})
+    n_cellv_bad = sum(1 for r in rows if r.get("_cellv_invalid"))
+    if n_cellv_bad:
+        print(f"cell voltage discarded as out of range on {n_cellv_bad} flights (wrong reported cell count)")
 
     fit_controls = by("control", "fit")
     meas_controls = by("control", "measure")
@@ -270,6 +292,24 @@ def main() -> int:
             lo, hi = wilson(k, len(rs))
             b2[g] = {"flagged": k, "n": len(rs), "rate": (k / len(rs)) if rs else None, "lo": lo, "hi": hi}
         baselines[f"logged_errors_{split}"] = b2
+        # A third baseline with no fitted threshold at all. PX4's own Flight
+        # Review colours its vibration plot green below 4.905 m/s2 and red above
+        # 9.81 on vehicle_imu_status.accel_vibration_metric
+        # (app/plot_app/configured_plots.py, add_horizontal_background_boxes).
+        # Nothing here chose those numbers, so they are the fairest outside
+        # comparison the study can make.
+        for tag, cut in (("fr_red", 9.81), ("fr_orange", 4.905)):
+            b3 = {}
+            for g in ("case", "control", "pilot", "poor"):
+                rs = [
+                    r for r in rows
+                    if r["group"] == g and r["split"] == split and r.get("vib_accel_p95") is not None
+                ]
+                k = sum(1 for r in rs if float(r["vib_accel_p95"]) > cut)
+                lo, hi = wilson(k, len(rs))
+                b3[g] = {"flagged": k, "n": len(rs), "rate": (k / len(rs)) if rs else None, "lo": lo, "hi": hi}
+            b3["cut"] = cut
+            baselines[f"{tag}_{split}"] = b3
 
     # Secondary check: where do the flights a reviewer called Vibration sit in
     # the vibration distribution of the whole cohort?
@@ -342,6 +382,23 @@ def main() -> int:
             item[n] = None if v is None else round(float(v), 4)
         queue.append(item)
 
+    # A rule that counts indicators is only fair if every group carries roughly
+    # the same number of them. A flight missing two indicators can never reach a
+    # count of eight, so if crashes were systematically thinner on data the rule
+    # would be biased. This is the check, reported on the page rather than
+    # assumed.
+    avail = {}
+    for g in ("case", "control", "pilot", "poor"):
+        rs = by(g, None)
+        if not rs:
+            continue
+        counts_present = [sum(1 for n in TIER1 if r.get(n) is not None) for r in rs]
+        avail[g] = {
+            "n": len(rs),
+            "mean_present": round(sum(counts_present) / len(counts_present), 2),
+            "of": len(TIER1),
+        }
+
     tiers = {}
     for t in ("legacy", "modern"):
         tiers[t] = {g: sum(1 for r in rows if r.get("tier") == t and r["group"] == g) for g in ("case", "control", "pilot", "poor", "labelled")}
@@ -350,6 +407,7 @@ def main() -> int:
         "false_alarm_budget": FALSE_ALARM_BUDGET,
         "counts": counts,
         "tiers": tiers,
+        "availability": avail,
         "indicators": per_indicator,
         "combined": combined,
         "combined_k": combined_k,
@@ -360,7 +418,11 @@ def main() -> int:
         "queue": queue,
         "fit_only": args.fit_only,
     }
-    name = "results_fit.json" if args.fit_only else "results.json"
+    out["tail_cut"] = args.tail_cut
+    if args.tail_cut:
+        name = f"results_cut{args.tail_cut}.json" + ("" if not args.fit_only else ".fit")
+    else:
+        name = "results_fit.json" if args.fit_only else "results.json"
     (DATA / name).write_text(json.dumps(out, indent=1))
     print(f"wrote data/{name}")
 

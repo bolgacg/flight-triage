@@ -154,6 +154,13 @@ first by log id. This removed 37 rows, most of them crashes, taking the cohort
 from 1,679 to 1,642 flights. The rule is mechanical and uses nothing about the
 indicators or the outcome.
 
+**14 September 2026, before the measured half was read: a validity rule on cell
+voltage.** Some packs report the wrong number of cells, which makes the lowest
+per-cell voltage come out at values a lithium cell cannot have. Readings outside
+2.0 to 4.6 volts are now treated as missing rather than as measurements. The rule
+is applied to every group alike and uses nothing about the outcome. It removed
+the reading on 39 flights and is reported in the indicator's coverage.
+
 **14 September 2026, after the fit half was read: a second combining rule.**
 The rule registered above flags a flight when any one of eight indicators goes
 over its threshold. Holding the false alarm budget then forces every one of the
@@ -163,6 +170,17 @@ eight sit above a looser threshold, with both k and the threshold quantile chose
 on the fit half. It is not preregistered, it is labelled as exploratory wherever
 it appears, and the registered rule is still reported beside it. The measured half
 was not consulted in choosing it.
+
+**14 September 2026, after the fit half was read: the whole study run again with
+the ending of every flight removed.** Every flight in the cohort ends on the
+ground, and an impact writes vibration and rate-tracking error into the log
+whatever caused it. On the fit half the falsification group was being flagged
+almost as often as the hardware and software group, which is exactly what that
+confound would look like. So the same indicators are computed a second time over
+the armed window minus its last 10 seconds, and both versions are reported side
+by side. This is an added analysis, not a replacement: the preregistered numbers
+stand as they are. The 10 seconds was chosen once, before the second pass ran,
+and no other value was tried.
 
 ## Reads of the measure half
 
