@@ -193,4 +193,12 @@ and no other value was tried.
    improvement, so the registered rule is the one reported. Pilot-error crashes
    are flagged at 28 percent, between the crash and healthy groups.
 2. **14 September 2026, the tail-cut pass.** The same read repeated on the second
-   pass, with the last 10 seconds of every flight removed, as described above.
+   pass, with the last 10 seconds of every flight removed and flights left with
+   under 15 seconds dropped. Result: the registered rule flags 37 percent of
+   hardware and software crashes, 18 percent of pilot-error crashes and 8 percent
+   of healthy flights, against 15 percent for PX4's own failure detector. So
+   about two thirds of what the rule found on the whole flight survives with the
+   ending taken away, the false-alarm rate does not move, and the gap between the
+   two crash groups is still a factor of two. That is the evidence that the
+   indicators are reading the aircraft rather than the impact, and it is the
+   answer to the falsification test set out above.
