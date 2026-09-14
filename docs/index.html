@@ -314,6 +314,14 @@ tr.on td{background:#eef2f7}
   <div class="sec-label">How it was built</div>
   <h2>Method, limits and sources</h2>
 
+  <div class="card" id="selfcheckcard">
+    <div class="card-title">This page checking itself</div>
+    <p class="small">The headline could have been typed in by hand and nobody would know. So the
+    page ships the per-flight numbers it was built from, re-applies the rule to them in your
+    browser right now, and prints what it gets beside what the build script got.</p>
+    <p class="small" id="selfcheck">Running.</p>
+  </div>
+
   <h3>The split, and why it is there</h3>
   <p class="small">Every flight was put in one of two halves by the first hexadecimal digit of the
   md5 hash of its log id: even chooses thresholds, odd reports them. Nothing about the flight's

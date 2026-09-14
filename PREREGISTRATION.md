@@ -184,4 +184,13 @@ and no other value was tried.
 
 ## Reads of the measure half
 
-None yet. Each one will be listed here with its date and reason.
+1. **14 September 2026, the planned read.** `study/score.py` run once on all 1,642
+   flights, after every threshold rule was fixed. Result: the registered rule
+   flags 56 percent of hardware and software crashes at 8 percent of healthy
+   flights, against 32 percent for PX4's own failure detector and 38 percent at
+   23 percent false alarms for the free "the autopilot wrote an error" rule. The
+   exploratory agreement rule reached 54 percent at 10 percent, which is not an
+   improvement, so the registered rule is the one reported. Pilot-error crashes
+   are flagged at 28 percent, between the crash and healthy groups.
+2. **14 September 2026, the tail-cut pass.** The same read repeated on the second
+   pass, with the last 10 seconds of every flight removed, as described above.

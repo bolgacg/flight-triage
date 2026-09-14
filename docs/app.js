@@ -503,6 +503,42 @@
     $('#limits3').textContent = 'Two of the battery numbers are weak and the page does not pretend otherwise. Some packs report the wrong cell count, which makes the lowest cell voltage come out at a value no lithium cell can have, so readings outside 2.0 to 4.6 volts are dropped as unusable rather than believed. Internal resistance, fitted from voltage against current, separates crashed flights from healthy ones barely at all.';
   }
 
+  /* ---------- the page checking its own headline ---------- */
+  function selfCheck() {
+    var host = $('#selfcheck');
+    if (!host) return;
+    if (!D.queue || !D.queue.length) { host.textContent = 'No per-flight data shipped, so nothing to check.'; return; }
+    var half = D.fit_only ? 'fit' : 'measure';
+    var built = D.combined[half] || D.combined.fit;
+    var thr = D.combined.thresholds || {};
+    var mine = {};
+    ['case', 'control', 'pilot', 'poor'].forEach(function (g) { mine[g] = { k: 0, n: 0 }; });
+    D.queue.forEach(function (r) {
+      var m = mine[r.group];
+      if (!m) return;
+      m.n++;
+      var hit = false;
+      Object.keys(thr).forEach(function (name) { if (overLine(name, r[name], thr[name])) hit = true; });
+      if (hit) m.k++;
+    });
+    var rows = ['case', 'control'].map(function (g) {
+      var b = built[g] || {}, m = mine[g];
+      return { g: g, built: b.flagged, builtN: b.n, mine: m.k, mineN: m.n };
+    });
+    var off = rows.filter(function (r) { return Math.abs((r.built || 0) - r.mine) > 1 || (r.builtN || 0) !== r.mineN; });
+    var text = rows.map(function (r) {
+      return GROUP_NAME[r.g] + ': the build script flagged ' + r.built + ' of ' + r.builtN +
+        ', this browser just flagged ' + r.mine + ' of ' + r.mineN;
+    }).join('. ') + '.';
+    if (off.length) {
+      host.innerHTML = '<b class="neg">MISMATCH.</b> ' + text +
+        ' That should not happen, and until it is fixed the numbers above cannot be trusted.';
+    } else {
+      host.innerHTML = '<b class="pos">Matched.</b> ' + text +
+        ' The indicator values travel to the page rounded to four decimals, so a flight sitting exactly on a threshold could land on either side; a difference of one flight would be that and nothing more.';
+    }
+  }
+
   /* ---------- the walkthrough ---------- */
   function tour() {
     var root = $('#tour'), hl = $('.tour-hl', root), card = $('.tour-card', root), idx = 0;
@@ -565,6 +601,7 @@
     renderIndicators();
     renderTailCut();
     fillProse();
+    selfCheck();
     var i0 = nearestBudgetIndex(D.false_alarm_budget);
     var sl = $('#bslider');
     sl.max = D.curve.length - 1;
