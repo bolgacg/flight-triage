@@ -171,7 +171,9 @@ def main() -> int:
                     n += 1
             return n
 
-        q = res["queue"]
+        # Long enough to have a story in it: a five second hop makes a poor
+        # illustration whatever the rule says about it.
+        q = [i for i in res["queue"] if (i.get("armed_s") or 0) >= 40]
         cases = sorted([i for i in q if i["group"] == "case"], key=hits)
         controls = sorted([i for i in q if i["group"] == "control"], key=hits)
         picks = []

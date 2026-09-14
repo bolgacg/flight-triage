@@ -90,8 +90,18 @@
   function above(name, v) {
     return overLine(name, v, D.indicators[name] ? D.indicators[name].threshold : null);
   }
+  // The rule reported everywhere is the one registered before the data was
+  // read. The second rule, chosen afterwards, is shown beside it and is not the
+  // headline unless it actually beats it, which it does not.
   function ruleThresholds() {
-    return (D.combined_k && D.combined_k.thresholds) || D.combined.thresholds || {};
+    return D.combined.thresholds || {};
+  }
+  function altBeatsPrimary() {
+    if (!D.combined_k) return false;
+    var half = D.fit_only ? 'fit' : 'measure';
+    var a = (D.combined_k[half] || D.combined_k.fit || {}).case;
+    var p = (D.combined[half] || D.combined.fit || {}).case;
+    return !!(a && p && a.rate != null && p.rate != null && a.rate > p.rate + 0.03);
   }
   function lineChart(host, series, colour) {
     var W = 860, H = 132, P = { l: 46, r: 10, t: 26, b: 24 };
@@ -242,7 +252,7 @@
   /* ---------- act three: the budget ---------- */
   function curveAt(i) { return D.curve[Math.max(0, Math.min(D.curve.length - 1, i))]; }
   function nearestBudgetIndex(target) {
-    var best = 0, bd = 1e9, rule = D.combined_k ? 'agree' : 'combined';
+    var best = 0, bd = 1e9, rule = 'combined';
     D.curve.forEach(function (c, i) {
       var fa = (c[rule] || {}).control;
       if (fa == null) return;
@@ -279,10 +289,9 @@
       s.appendChild(el('path', a));
     }
     var hasAgree = !!D.combined_k;
-    if (hasAgree) pathFor('agree', 'case', '#b03a3a', null, 2.4);
-    pathFor('combined', 'case', '#8b95a1', '2 3');
-    if (hasAgree) pathFor('agree', 'pilot', '#c8860d', '5 4');
-    else pathFor('combined', 'pilot', '#c8860d', '5 4');
+    pathFor('combined', 'case', '#b03a3a', null, 2.4);
+    if (hasAgree) pathFor('agree', 'case', '#8b95a1', '2 3');
+    pathFor('combined', 'pilot', '#c8860d', '5 4');
 
     var bl = D.baselines['failure_detector_measure'] || D.baselines['failure_detector_fit'];
     if (bl && bl.case.rate != null && bl.control.rate != null) {
@@ -294,7 +303,7 @@
       s.appendChild(el('circle', { cx: X(le.control.rate), cy: Y(le.case.rate), r: 5, fill: '#5b6470' }));
       s.appendChild(el('text', { x: X(le.control.rate) + 9, y: Y(le.case.rate) + 4, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470' }, 'any error written by the autopilot'));
     }
-    var live = hasAgree ? c.agree : c.combined;
+    var live = c.combined;
     if (live && live.control != null && live.case != null) {
       s.appendChild(el('circle', { cx: X(live.control), cy: Y(live.case), r: 7, fill: '#fff', stroke: '#b03a3a', 'stroke-width': 3 }));
     }
@@ -302,9 +311,9 @@
     s.appendChild(el('text', { x: 14, y: P.t + 6, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470', transform: 'rotate(-90 14 ' + (P.t + 6) + ')' }, 'Share of crashed flights found'));
     host.appendChild(s);
     $('#budgetlegend').innerHTML =
-      (hasAgree ? '<span><i style="border-color:#b03a3a"></i>agreement rule, crashes found</span>' : '') +
-      '<span><i style="border-color:#8b95a1;border-top-style:dotted"></i>the rule registered in advance, crashes found</span>' +
-      '<span><i style="border-color:#c8860d;border-top-style:dashed"></i>same rule on pilot-error crashes</span>' +
+      '<span><i style="border-color:#b03a3a"></i>the rule registered in advance, crashes found</span>' +
+      (hasAgree ? '<span><i style="border-color:#8b95a1;border-top-style:dotted"></i>the rule tried afterwards</span>' : '') +
+      '<span><i style="border-color:#c8860d;border-top-style:dashed"></i>registered rule on pilot-error crashes</span>' +
       '<span><i class="bar" style="background:#2c4a6b"></i>PX4’s own failure detector</span>' +
       '<span><i class="bar" style="background:#5b6470"></i>any error written by the autopilot</span>';
 
@@ -316,9 +325,9 @@
       '<div><div class="k">Unsatisfactory found</div><div class="n">' + pct(live.poor) + '</div><div class="s">flights that flew badly</div></div>' +
       (hasAgree ? (function () {
         var half = D.fit_only ? 'fit' : 'measure';
-        var reg = D.combined[half] || D.combined.fit;
-        return '<div><div class="k">Registered rule</div><div class="n">' + pct(reg.case.rate) +
-          '</div><div class="s">at its own 10% budget, fixed in advance</div></div>';
+        var alt = D.combined_k[half] || D.combined_k.fit;
+        return '<div><div class="k">The rule tried after</div><div class="n">' + pct(alt.case.rate) +
+          '</div><div class="s">at ' + pct(alt.control.rate) + ' false alarms, no better</div></div>';
       })() : '');
   }
 
@@ -327,7 +336,7 @@
     var host = $('#falsviz'); if (!host) return;
     host.innerHTML = '';
     var cc = curveAt(i);
-    var c = { combined: D.combined_k ? cc.agree : cc.combined };
+    var c = { combined: cc.combined };
     var bars = [
       { k: 'case', c: '#b03a3a' }, { k: 'pilot', c: '#c8860d' },
       { k: 'poor', c: '#8b95a1' }, { k: 'control', c: '#2f7d54' }
@@ -349,10 +358,10 @@
   /* ---------- act four: the same rule with the ending hidden ---------- */
   function renderTailCut() {
     var block = $('#cutblock');
-    if (!block || !D.cut || !D.cut.combined_k) return;
+    if (!block || !D.cut || !D.cut.combined) return;
     var half = D.fit_only ? 'fit' : 'measure';
-    var full = (D.combined_k && (D.combined_k[half] || D.combined_k.fit)) || D.combined[half] || D.combined.fit;
-    var cut = D.cut.combined_k[half] || D.cut.combined_k.fit;
+    var full = D.combined[half] || D.combined.fit;
+    var cut = (D.cut.combined && (D.cut.combined[half] || D.cut.combined.fit)) || null;
     if (!full || !cut) return;
     block.hidden = false;
     var t = $('#cuttable');
@@ -397,16 +406,16 @@
   /* ---------- the sentences that carry numbers ---------- */
   function fillProse() {
     var half = D.fit_only ? 'fit' : 'measure';
-    var reg = D.combined[half] || D.combined.fit;
-    var comb = D.combined_k ? (D.combined_k[half] || D.combined_k.fit) : reg;
+    var comb = D.combined[half] || D.combined.fit;
+    var alt = D.combined_k ? (D.combined_k[half] || D.combined_k.fit) : null;
     var bl = D.baselines['failure_detector_' + half] || D.baselines.failure_detector_fit;
     var n = D.counts;
     $('#p-total').textContent = '463,000';
     $('#dek').innerHTML =
       '<strong>' + pct(comb.case.rate) + ' of the flights that crashed for a hardware or software reason can be found by reading the log alone</strong>, ' +
       'at one false alarm in every ' + Math.max(1, Math.round(1 / (comb.control.rate || 0.1))) + ' healthy flights, ' +
-      'across ' + (n.case.total + n.control.total + n.pilot.total + n.poor.total) + ' public flights from a decade of firmware. ' +
-      (D.combined_k ? 'The rule that manages it was chosen after the first half of the data was read. <strong>The rule registered in advance found ' + pct(reg.case.rate) + '</strong>, and that failure is act three. ' : '') +
+      'across ' + (n.case.total + n.control.total + n.pilot.total + n.poor.total) + ' public flights spanning a decade of firmware. ' +
+      'The rule was written down before the data was read, fixed on one half of the flights and measured once on the other. ' +
       'The autopilot’s own failure detector, already running on these aircraft, finds ' + pct(bl.case.rate) + ' of them.';
     $('#cohorttext').innerHTML =
       n.case.total + ' flights the pilot rated as a crash caused by hardware or software, ' +
@@ -439,13 +448,21 @@
         })() + ' are flights the pilot rated as a hardware or software crash, against ' +
         Math.round(40 * (D.counts.case.measure / Math.max(1, D.counts.case.measure + D.counts.control.measure + D.counts.pilot.measure + D.counts.poor.measure))) +
         ' if the order were random.';
-      $('#v3').innerHTML = '<b>The rule written down in advance was the wrong shape.</b> It flagged a flight when any one of eight indicators went over, so holding the false alarm budget forced every one of them to a strict threshold, and it found ' +
-        pct(reg.case.rate) + ' of crashes, worse than ' + D.indicators[best.k].label.toLowerCase() + ' on its own at ' + pct(best.r) + '. ' +
-        (D.combined_k ? 'Asking instead for agreement, at least ' + D.combined_k.k + ' of the 8 indicators over a looser threshold, finds ' + pct(comb.case.rate) +
-          ' for the same budget, against ' + pct(bl.case.rate) + ' for the check the autopilot already runs. That second rule was chosen after the fit half was read, which is why it is drawn in a different line and named as exploratory everywhere it appears.' : '');
-      $('#v4').innerHTML = '<b>The rule reads aircraft, not outcomes.</b> At the preregistered budget it flags ' + pct(comb.case.rate) +
-        ' of hardware and software crashes and ' + pct(comb.pilot.rate) + ' of crashes the pilot blamed on themselves.' +
-        (comb.pilot.n < 30 ? ' That comparison rests on only ' + comb.pilot.n + ' pilot-error flights, which is too few to lean on hard.' : '');
+      $('#v3').innerHTML = '<b>The registered rule finds ' + pct(comb.case.rate) + ' of crashes at ' + pct(comb.control.rate) +
+        ' false alarms</b>, against ' + pct(bl.case.rate) + ' for the check the autopilot already runs in flight. ' +
+        'The strongest single number is ' + D.indicators[best.k].label.toLowerCase() + ', at ' + pct(best.r) + ' on its own. ' +
+        (alt ? 'Halfway through, the registered rule looked wrong and a cleverer one was tried: flag a flight when at least ' + D.combined_k.k +
+          ' of the eight indicators agree. On the measured half it found ' + pct(alt.case.rate) + ' at ' + pct(alt.control.rate) +
+          ', which is not an improvement. It is drawn as the dotted line and it stays on the page, because a rule that was tried and did not help is part of the record.' : '');
+      var gap = comb.case.rate - comb.pilot.rate;
+      $('#v4').innerHTML = '<b>' + (gap > 0.15
+        ? 'The rule separates the two kinds of crash, but not completely.'
+        : 'The rule does not separate the two kinds of crash, and that is a problem for its claim.') + '</b> ' +
+        'At the registered budget it flags ' + pct(comb.case.rate) + ' of hardware and software crashes, ' + pct(comb.pilot.rate) +
+        ' of crashes the pilot blamed on themselves, and ' + pct(comb.control.rate) + ' of healthy flights. ' +
+        'Pilot-error crashes sit between the two, which is what you would expect if part of what the indicators see is the ending rather than the aircraft. ' +
+        (comb.pilot.n < 60 ? 'That comparison rests on ' + comb.pilot.n + ' pilot-error flights, so it is a signal and not a proof. ' : '') +
+        'The next block takes the ending away and looks again.';
     }
     if (worst) {
       $('#v5').innerHTML = '<b>' + D.indicators[worst.k].label + ' does not earn its place.</b> At the same budget it finds ' + pct(worst.r) +
@@ -462,9 +479,7 @@
         ['What it predicts', 'Whether a flight will have been rated a crash caused by hardware or software. It is a ranking, not a diagnosis, and it names no part.'],
         ['What it reads', tierOneNames().length + ' numbers per flight, computed from the log over the armed window only: ' +
           tierOneNames().map(function (k) { return D.indicators[k].label; }).join('; ') + '.'],
-        ['Free parameters', D.combined_k
-          ? 'Three. One quantile shared by all eight thresholds, and the count of indicators that must agree, for the exploratory rule; one quantile for the rule registered in advance.'
-          : 'One. A single quantile shared by all eight thresholds.'],
+        ['Free parameters', 'One. A single quantile shared by all eight thresholds, chosen on the fit half so the rule spends its false alarm budget once. A second rule with two free parameters was tried afterwards and did not do better.'],
         ['Fitted on', nFit + ' flights in the fit half (' + n.case.fit + ' crashes, ' + n.control.fit + ' healthy). Thresholds are set so the rule flags ' + pct(D.false_alarm_budget) + ' of the healthy ones.'],
         ['Scored on', nMeas + ' flights in the measured half, read once, after the rules were fixed.'],
         ['Performance', pct(comb.case.rate) + ' of crashes found (95% interval ' + pct(comb.case.lo) + ' to ' + pct(comb.case.hi) + '), at ' + pct(comb.control.rate) + ' of healthy flights flagged.'],
