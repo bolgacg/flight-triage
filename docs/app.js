@@ -438,7 +438,14 @@
     });
     if (best) {
       $('#v1').innerHTML = '<b>One flight is an anecdote.</b> The rest of this page is about whether the same reading holds across ' +
-        (D.counts.case.total + D.counts.control.total) + ' flights, and whether it costs more in false alarms than it is worth.';
+        (D.counts.case.total + D.counts.control.total) + ' flights, and whether it costs more in false alarms than it is worth. ' +
+        'Three counts appear on this page and they are not the same set. ' +
+        (D.counts.case.total + D.counts.control.total + D.counts.pilot.total + D.counts.poor.total + D.counts.labelled.total) +
+        ' flights were downloaded and measured; ' +
+        (D.counts.case.total + D.counts.control.total + D.counts.pilot.total + D.counts.poor.total) +
+        ' of those carry a pilot rating, which is what the groups are built from; and ' +
+        (D.counts.case.total + D.counts.control.total) +
+        ' sit in the two groups this comparison is made on, crashed against healthy.';
       $('#v2').innerHTML = '<b>The order is the product.</b> Sorting by how many indicators sit above threshold puts crashed flights near the top: of the first forty rows, ' +
         (function () {
           var rows = D.queue.slice(); rows.forEach(function (r) { r._h = hits(r); });
@@ -446,8 +453,8 @@
           var top = rows.slice(0, 40);
           return top.filter(function (r) { return r.group === 'case'; }).length;
         })() + ' are flights the pilot rated as a hardware or software crash, against ' +
-        Math.round(40 * (D.counts.case.measure / Math.max(1, D.counts.case.measure + D.counts.control.measure + D.counts.pilot.measure + D.counts.poor.measure))) +
-        ' if the order were random.';
+        Math.round(40 * (D.counts.case.measure / Math.max(1, D.queue.length))) +
+        ' if the order were random, since the list it ranks is ' + D.queue.length + ' flights long.';
       $('#v3').innerHTML = '<b>The registered rule finds ' + pct(comb.case.rate) + ' of crashes at ' + pct(comb.control.rate) +
         ' false alarms</b>, against ' + pct(bl.case.rate) + ' for the check the autopilot already runs in flight. ' +
         'The strongest single number is ' + D.indicators[best.k].label.toLowerCase() + ', at ' + pct(best.r) + ' on its own. ' +
