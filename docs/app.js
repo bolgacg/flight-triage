@@ -307,8 +307,16 @@
     if (live && live.control != null && live.case != null) {
       s.appendChild(el('circle', { cx: X(live.control), cy: Y(live.case), r: 7, fill: '#fff', stroke: '#b03a3a', 'stroke-width': 3 }));
     }
-    s.appendChild(el('text', { x: P.l, y: H - 6, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470' }, 'Across: share of healthy flights wrongly flagged'));
-    s.appendChild(el('text', { x: 14, y: P.t + 6, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470', transform: 'rotate(-90 14 ' + (P.t + 6) + ')' }, 'Share of crashed flights found'));
+    // Both axis titles are centred on their axis. The vertical one was anchored at
+    // the top of the plot and rotated upward from there, so it ran off the canvas
+    // and only its first few letters were ever drawn.
+    var midX = (P.l + (W - P.r)) / 2, midY = (P.t + (H - P.b)) / 2;
+    s.appendChild(el('text', { x: midX, y: H - 6, 'text-anchor': 'middle',
+      'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470' },
+      'Share of healthy flights wrongly flagged'));
+    s.appendChild(el('text', { x: 15, y: midY, 'text-anchor': 'middle',
+      'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470',
+      transform: 'rotate(-90 15 ' + midY + ')' }, 'Share of crashed flights found'));
     host.appendChild(s);
     $('#budgetlegend').innerHTML =
       '<span><i style="border-color:#b03a3a"></i>the rule registered in advance, crashes found</span>' +
