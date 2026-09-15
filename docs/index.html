@@ -120,6 +120,31 @@ tr.on td{background:#eef2f7}
   </div>
 </div></header>
 
+<section id="bluf"><div class="wrap">
+  <div class="sec-label">The answer, before anything else</div>
+  <h2>A rule read off the log beats the check the aircraft already runs</h2>
+  <p class="lede">Every line is a rule you could run over the same flight logs, traced across all
+  its strictness settings. Up is the share of crashed flights it finds. Right is the share of
+  healthy flights it wrongly flags. So higher and further left is better, and the dashed diagonal
+  is what flagging at random looks like. The red line is the rule this page fixed in advance, the
+  open circle is the setting it was fixed at, and the two dots are what an operator already has
+  today without building anything.</p>
+  <div class="card" id="budgetcard">
+    <label class="small" for="bslider"><b>False alarm budget:</b>
+      <span class="num" id="blabel">10%</span> of healthy flights flagged</label>
+    <input class="slider" type="range" id="bslider" min="0" max="44" value="0">
+    <p class="hint">Drag it. Left is a stricter rule that misses more; right is a noisier rule that
+      catches more. The thresholds were set to spend 10 percent of the budget on the fit half, and
+      the figure above is what they actually cost on the measured half, which is the number that
+      counts. Every other point on the slider was produced after the fact and is exploration.</p>
+    <div class="viz" id="budgetviz"></div>
+    <div class="legend" id="budgetlegend"></div>
+  </div>
+  <div class="stat" id="blufstat"></div>
+  <p class="hint">Everything below this chart is how it was made and where it fails. The thresholds
+  were fixed on one half of the flights and the other half was read exactly once.</p>
+</div></section>
+
 <section id="primer"><div class="wrap">
   <div class="sec-label">Before anything else</div>
   <h2>Five things to know</h2>
@@ -146,7 +171,7 @@ tr.on td{background:#eef2f7}
 
   <div class="card" id="domain">
     <div class="card-title">What happens to one log</div>
-    <p class="small">The whole study in one picture. Read left to right.</p>
+    <p class="small" id="domainhint">The whole study in one picture.</p>
     <div class="viz" id="domainviz"></div>
   </div>
 
@@ -263,18 +288,8 @@ tr.on td{background:#eef2f7}
   and see what each one finds.</p>
   <p class="lede">Every threshold on this page is set on the fit half so that the rule flags a fixed
   share of flights the pilot called good. That share is the budget. The preregistered budget is one
-  in ten; the slider shows the rest of the family, and those other points were not fixed in advance.</p>
-  <div class="card" id="budgetcard">
-    <label class="small" for="bslider"><b>False alarm budget:</b>
-      <span class="num" id="blabel">10%</span> of healthy flights flagged</label>
-    <input class="slider" type="range" id="bslider" min="0" max="44" value="0">
-    <p class="hint">Drag it. Left is a stricter rule that misses more; right is a noisier rule that
-      catches more. The thresholds were set to spend 10 percent of the budget on the fit half, and
-      the figure above is what they actually cost on the measured half, which is the number that
-      counts. Every other point on the slider was produced after the fact and is exploration.</p>
-    <div class="viz" id="budgetviz"></div>
-    <div class="legend" id="budgetlegend"></div>
-  </div>
+  in ten; the chart at the top of this page is the rest of that family, and those other points were
+  not fixed in advance. Drag its slider and the numbers in this section follow.</p>
   <div class="stat" id="budgetstat"></div>
   <div class="verdict" id="v3"></div>
 </div></section>

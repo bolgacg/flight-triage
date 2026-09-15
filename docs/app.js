@@ -41,36 +41,84 @@
   function drawDomain() {
     var host = $('#domainviz');
     if (!host) return;
+    host.innerHTML = '';   // this is redrawn on a width change, so it must replace
+    // At phone width a 900-unit drawing is scaled to about a third, which puts its
+    // labels near three pixels. The boxes stack instead, so the drawing stays close
+    // to its rendered size and the text stays readable.
+    var narrow = window.innerWidth < 620;
+    var steps = [
+      { t: 'One flight', s: 'a few hundred thousand rows of sensor and command data' },
+      { t: 'Armed window', s: 'only the part where the motors could turn' },
+      { t: 'Indicators', s: 'one number each for vibration, the estimator, tracking, battery and satellites' },
+      { t: 'Threshold', s: 'set on the fit half to spend the false alarm budget' },
+      { t: 'A queue', s: 'the flights a person should open first' }
+    ];
+    var foot = 'The human rating enters only at the very end, to check whether the queue was in a useful order.';
+
+    function wrap(txt, per) {
+      var out = [], line = '';
+      txt.split(' ').forEach(function (w) {
+        if ((line + ' ' + w).length > per) { out.push(line); line = w; }
+        else line = line ? line + ' ' + w : w;
+      });
+      if (line) out.push(line);
+      return out;
+    }
+
+    if (narrow) {
+      var W = 380, BW = 364, GAP = 16, pad = 12, lines = steps.map(function (b) { return wrap(b.s, 44); });
+      var heights = lines.map(function (l) { return 26 + l.length * 15 + 10; });
+      var H = heights.reduce(function (a, b) { return a + b + GAP; }, 0) + 34;
+      var s2 = el('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'One flight log becomes a set of indicators, which sort a queue of flights' });
+      var y = 4;
+      steps.forEach(function (b, i) {
+        var bh = heights[i];
+        s2.appendChild(el('rect', { x: 8, y: y, width: BW, height: bh, rx: 6, fill: '#fff', stroke: '#c9c5be' }));
+        s2.appendChild(el('text', { x: 8 + pad, y: y + 22, 'font-family': "'Newsreader',Georgia,serif", 'font-size': 17, 'font-weight': 600, fill: '#1a1d21' }, b.t));
+        lines[i].forEach(function (ln, k) {
+          s2.appendChild(el('text', { x: 8 + pad, y: y + 40 + k * 15, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 12.5, fill: '#5b6470' }, ln));
+        });
+        if (i < steps.length - 1) {
+          s2.appendChild(el('line', { x1: W / 2, y1: y + bh + 3, x2: W / 2, y2: y + bh + GAP - 3, stroke: '#8b95a1', 'stroke-width': 1.5 }));
+          s2.appendChild(el('circle', { cx: W / 2, cy: y + bh + GAP - 4, r: 2.5, fill: '#8b95a1' }));
+        }
+        y += bh + GAP;
+      });
+      wrap(foot, 52).forEach(function (ln, k) {
+        s2.appendChild(el('text', { x: 8, y: y + 8 + k * 14, 'font-family': "'IBM Plex Mono',monospace", 'font-size': 11, fill: '#8b95a1' }, ln));
+      });
+      host.appendChild(s2);
+      var hint = $('#domainhint');
+      if (hint) hint.textContent = 'The whole study in one picture. Read top to bottom.';
+      return;
+    }
+
     var W = 900, H = 186;
     var s = el('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'One flight log becomes a set of indicators, which sort a queue of flights' });
     var boxes = [
-      { x: 8, w: 168, t: 'One flight', s: 'a few hundred thousand rows of sensor and command data' },
-      { x: 196, w: 168, t: 'Armed window', s: 'only the part where the motors could turn' },
-      { x: 384, w: 168, t: 'Indicators', s: 'one number each for vibration, the estimator, tracking, battery and satellites' },
-      { x: 572, w: 140, t: 'Threshold', s: 'set on the fit half to spend the false alarm budget' },
-      { x: 732, w: 160, t: 'A queue', s: 'the flights a person should open first' }
+      { x: 8, w: 168, t: steps[0].t, s: steps[0].s },
+      { x: 196, w: 168, t: steps[1].t, s: steps[1].s },
+      { x: 384, w: 168, t: steps[2].t, s: steps[2].s },
+      { x: 572, w: 140, t: steps[3].t, s: steps[3].s },
+      { x: 732, w: 160, t: steps[4].t, s: steps[4].s }
     ];
     boxes.forEach(function (b, i) {
       s.appendChild(el('rect', { x: b.x, y: 28, width: b.w, height: 112, rx: 6, fill: '#fff', stroke: '#c9c5be' }));
       s.appendChild(el('text', { x: b.x + 12, y: 52, 'font-family': "'Newsreader',Georgia,serif", 'font-size': 16, 'font-weight': 600, fill: '#1a1d21' }, b.t));
-      var words = b.s.split(' '), line = '', y = 72;
-      var put = function (txt) {
-        s.appendChild(el('text', { x: b.x + 12, y: y, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11, fill: '#5b6470' }, txt));
-        y += 14;
-      };
-      words.forEach(function (w) {
-        if ((line + ' ' + w).length > 25) { put(line); line = w; }
-        else line = line ? line + ' ' + w : w;
+      var y2 = 72;
+      wrap(b.s, 25).forEach(function (ln) {
+        s.appendChild(el('text', { x: b.x + 12, y: y2, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11, fill: '#5b6470' }, ln));
+        y2 += 14;
       });
-      if (line) put(line);
       if (i < boxes.length - 1) {
         var x1 = b.x + b.w + 3, x2 = boxes[i + 1].x - 3;
         s.appendChild(el('line', { x1: x1, y1: 84, x2: x2, y2: 84, stroke: '#8b95a1', 'stroke-width': 1.5 }));
         s.appendChild(el('circle', { cx: x2 - 2, cy: 84, r: 2.5, fill: '#8b95a1' }));
       }
     });
-    s.appendChild(el('text', { x: 8, y: 166, 'font-family': "'IBM Plex Mono',monospace", 'font-size': 10.5, fill: '#8b95a1' },
-      'The human rating enters only at the very end, to check whether the queue was in a useful order.'));
+    s.appendChild(el('text', { x: 8, y: 166, 'font-family': "'IBM Plex Mono',monospace", 'font-size': 10.5, fill: '#8b95a1' }, foot));
+    var hintW = $('#domainhint');
+    if (hintW) hintW.textContent = 'The whole study in one picture. Read left to right.';
     host.appendChild(s);
   }
 
@@ -104,7 +152,10 @@
     return !!(a && p && a.rate != null && p.rate != null && a.rate > p.rate + 0.03);
   }
   function lineChart(host, series, colour) {
-    var W = 860, H = 132, P = { l: 46, r: 10, t: 26, b: 24 };
+    var narrow = window.innerWidth < 620;
+    var W = narrow ? 390 : 860, H = narrow ? 150 : 132;
+    var P = narrow ? { l: 42, r: 8, t: 28, b: 26 } : { l: 46, r: 10, t: 26, b: 24 };
+    var FS = narrow ? 12 : 10;
     var xs = series.x, ys = series.y;
     if (!xs.length) return;
     var xmax = Math.max.apply(null, xs), ymax = Math.max.apply(null, ys) || 1;
@@ -119,7 +170,7 @@
     s.appendChild(el('path', { d: d, fill: 'none', stroke: colour, 'stroke-width': 1.6 }));
     s.appendChild(el('text', { x: P.l, y: H - 6, 'font-family': "'IBM Plex Mono',monospace", 'font-size': 9.5, fill: '#8b95a1' }, '0 s'));
     s.appendChild(el('text', { x: W - P.r, y: H - 6, 'text-anchor': 'end', 'font-family': "'IBM Plex Mono',monospace", 'font-size': 9.5, fill: '#8b95a1' }, Math.round(xmax) + ' s'));
-    s.appendChild(el('text', { x: P.l, y: 12, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470' }, series.label + ' (' + series.unit + ')'));
+    s.appendChild(el('text', { x: P.l, y: 12, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': FS, fill: '#5b6470' }, series.label + ' (' + series.unit + ')'));
     host.appendChild(s);
   }
   function renderExamples() {
@@ -265,18 +316,22 @@
     host.innerHTML = '';
     var c = curveAt(i);
     $('#blabel').textContent = pct(c.combined.control);
-    var W = 860, H = 300, P = { l: 56, r: 16, t: 16, b: 42 };
+    var narrow = window.innerWidth < 620;
+    var W = narrow ? 380 : 860, H = narrow ? 300 : 300;
+    var P = narrow ? { l: 42, r: 10, t: 14, b: 40 } : { l: 56, r: 16, t: 16, b: 42 };
+    var FS = narrow ? 13 : 10, FL = narrow ? 13.5 : 11.5;
     var s = el('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Detection rate against false alarm rate' });
     var X = function (v) { return P.l + v * (W - P.l - P.r); };
     var Y = function (v) { return H - P.b - v * (H - P.t - P.b); };
-    for (var g = 0; g <= 1.0001; g += 0.25) {
+    var stepG = narrow ? 0.5 : 0.25;
+    for (var g = 0; g <= 1.0001; g += stepG) {
       s.appendChild(el('line', { x1: P.l, y1: Y(g), x2: W - P.r, y2: Y(g), stroke: '#e2e0dc' }));
-      s.appendChild(el('text', { x: P.l - 8, y: Y(g) + 4, 'text-anchor': 'end', 'font-family': "'IBM Plex Mono',monospace", 'font-size': 10, fill: '#8b95a1' }, pct(g)));
+      s.appendChild(el('text', { x: P.l - 6, y: Y(g) + 4, 'text-anchor': 'end', 'font-family': "'IBM Plex Mono',monospace", 'font-size': FS, fill: '#8b95a1' }, pct(g)));
       s.appendChild(el('line', { x1: X(g), y1: P.t, x2: X(g), y2: H - P.b, stroke: '#f0eeea' }));
-      s.appendChild(el('text', { x: X(g), y: H - P.b + 16, 'text-anchor': 'middle', 'font-family': "'IBM Plex Mono',monospace", 'font-size': 10, fill: '#8b95a1' }, pct(g)));
+      s.appendChild(el('text', { x: X(g), y: H - P.b + 17, 'text-anchor': 'middle', 'font-family': "'IBM Plex Mono',monospace", 'font-size': FS, fill: '#8b95a1' }, pct(g)));
     }
     s.appendChild(el('line', { x1: P.l, y1: Y(0), x2: X(1), y2: Y(1), stroke: '#c9c5be', 'stroke-dasharray': '4 4' }));
-    s.appendChild(el('text', { x: X(0.62), y: Y(0.58), 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 10.5, fill: '#8b95a1' }, 'a rule that knows nothing'));
+    if (!narrow) s.appendChild(el('text', { x: X(0.62), y: Y(0.58), 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 10.5, fill: '#8b95a1' }, 'a rule that knows nothing'));
 
     function pathFor(rule, group, colour, dash, width) {
       var pts = D.curve.map(function (cc) { return [(cc[rule] || {}).control, (cc[rule] || {})[group]]; })
@@ -296,12 +351,12 @@
     var bl = D.baselines['failure_detector_measure'] || D.baselines['failure_detector_fit'];
     if (bl && bl.case.rate != null && bl.control.rate != null) {
       s.appendChild(el('circle', { cx: X(bl.control.rate), cy: Y(bl.case.rate), r: 6, fill: '#2c4a6b' }));
-      s.appendChild(el('text', { x: X(bl.control.rate) + 10, y: Y(bl.case.rate) + 4, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#2c4a6b' }, "PX4's own failure detector"));
+      if (!narrow) s.appendChild(el('text', { x: X(bl.control.rate) + 10, y: Y(bl.case.rate) + 4, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#2c4a6b' }, "PX4's own failure detector"));
     }
     var le = D.baselines['logged_errors_measure'] || D.baselines['logged_errors_fit'];
     if (le && le.case.rate != null && le.control.rate != null) {
       s.appendChild(el('circle', { cx: X(le.control.rate), cy: Y(le.case.rate), r: 5, fill: '#5b6470' }));
-      s.appendChild(el('text', { x: X(le.control.rate) + 9, y: Y(le.case.rate) + 4, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470' }, 'any error written by the autopilot'));
+      if (!narrow) s.appendChild(el('text', { x: X(le.control.rate) + 9, y: Y(le.case.rate) + 4, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470' }, 'any error written by the autopilot'));
     }
     var live = c.combined;
     if (live && live.control != null && live.case != null) {
@@ -312,10 +367,10 @@
     // and only its first few letters were ever drawn.
     var midX = (P.l + (W - P.r)) / 2, midY = (P.t + (H - P.b)) / 2;
     s.appendChild(el('text', { x: midX, y: H - 6, 'text-anchor': 'middle',
-      'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470' },
+      'font-family': "'IBM Plex Sans',sans-serif", 'font-size': FL, fill: '#5b6470' },
       'Share of healthy flights wrongly flagged'));
     s.appendChild(el('text', { x: 15, y: midY, 'text-anchor': 'middle',
-      'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11.5, fill: '#5b6470',
+      'font-family': "'IBM Plex Sans',sans-serif", 'font-size': FL, fill: '#5b6470',
       transform: 'rotate(-90 15 ' + midY + ')' }, 'Share of crashed flights found'));
     host.appendChild(s);
     $('#budgetlegend').innerHTML =
@@ -324,6 +379,25 @@
       '<span><i style="border-color:#c8860d;border-top-style:dashed"></i>registered rule on pilot-error crashes</span>' +
       '<span><i class="bar" style="background:#2c4a6b"></i>PX4’s own failure detector</span>' +
       '<span><i class="bar" style="background:#5b6470"></i>any error written by the autopilot</span>';
+
+    // The chart now opens the page, so the comparison it makes gets stated in numbers
+    // beside it. This is the BLUF: what was built, against what an operator already has.
+    var bs = $('#blufstat');
+    if (bs) {
+      var fd = D.baselines['failure_detector_measure'] || D.baselines['failure_detector_fit'];
+      var lg = D.baselines['logged_errors_measure'] || D.baselines['logged_errors_fit'];
+      bs.innerHTML =
+        '<div><div class="k">This rule</div><div class="n">' + pct(live.case) +
+        '</div><div class="s">of crashes found, at ' + pct(live.control) + ' false alarms</div></div>' +
+        (fd ? '<div><div class="k">PX4\'s own detector</div><div class="n">' + pct(fd.case.rate) +
+          '</div><div class="s">the check the aircraft already runs in flight</div></div>' : '') +
+        (lg ? '<div><div class="k">Any logged error</div><div class="n">' + pct(lg.case.rate) +
+          '</div><div class="s">the free rule, at ' + pct(lg.control.rate) + ' false alarms</div></div>' : '') +
+        '<div><div class="k">Flights read</div><div class="n">' +
+        (D.counts.case.total + D.counts.control.total + D.counts.pilot.total +
+         D.counts.poor.total + D.counts.labelled.total).toLocaleString('en-GB') +
+        '</div><div class="s">public logs, thresholds fixed on half</div></div>';
+    }
 
     var stat = $('#budgetstat');
     stat.innerHTML =
@@ -349,16 +423,19 @@
       { k: 'case', c: '#b03a3a' }, { k: 'pilot', c: '#c8860d' },
       { k: 'poor', c: '#8b95a1' }, { k: 'control', c: '#2f7d54' }
     ].filter(function (b) { return c.combined[b.k] != null; });
-    var W = 860, H = 200, P = { l: 210, r: 60, t: 10, b: 26 };
+    var narrow = window.innerWidth < 620;
+    var W = narrow ? 390 : 860, H = narrow ? 210 : 200;
+    var P = narrow ? { l: 128, r: 44, t: 10, b: 30 } : { l: 210, r: 60, t: 10, b: 26 };
+    var FS = narrow ? 11.5 : 12.5, FSN = narrow ? 11.5 : 11;
     var s = el('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Share of flights flagged in each group' });
     var bh = (H - P.t - P.b) / bars.length;
     bars.forEach(function (b, k) {
       var v = c.combined[b.k], y = P.t + k * bh;
-      s.appendChild(el('text', { x: P.l - 10, y: y + bh / 2 + 4, 'text-anchor': 'end', 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 12.5, fill: '#1a1d21' }, GROUP_NAME[b.k]));
+      s.appendChild(el('text', { x: P.l - 10, y: y + bh / 2 + 4, 'text-anchor': 'end', 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': FS, fill: '#1a1d21' }, GROUP_NAME[b.k]));
       s.appendChild(el('rect', { x: P.l, y: y + 6, width: Math.max(1, v * (W - P.l - P.r)), height: bh - 14, rx: 2, fill: b.c }));
-      s.appendChild(el('text', { x: P.l + v * (W - P.l - P.r) + 8, y: y + bh / 2 + 4, 'font-family': "'IBM Plex Mono',monospace", 'font-size': 12, fill: '#1a1d21' }, pct(v)));
+      s.appendChild(el('text', { x: P.l + v * (W - P.l - P.r) + 8, y: y + bh / 2 + 4, 'font-family': "'IBM Plex Mono',monospace", 'font-size': FS, fill: '#1a1d21' }, pct(v)));
     });
-    s.appendChild(el('text', { x: P.l, y: H - 6, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': 11, fill: '#8b95a1' }, 'Share of each group the combined rule flags, at the budget set in act three'));
+    s.appendChild(el('text', { x: P.l, y: H - 6, 'font-family': "'IBM Plex Sans',sans-serif", 'font-size': FSN, fill: '#8b95a1' }, 'Share of each group the combined rule flags, at the budget set in act three'));
     host.appendChild(s);
     $('#falslegend').innerHTML = '<span class="hint">The bar for pilot-error crashes is the one to watch. If it matched the top bar, the rule would be reading outcomes rather than aircraft.</span>';
   }
@@ -558,15 +635,17 @@
   function tour() {
     var root = $('#tour'), hl = $('.tour-hl', root), card = $('.tour-card', root), idx = 0;
     var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // The walkthrough follows the page, so these are in the order the sections
+    // appear. The comparison chart opens the page now, which makes it step two.
     var STEPS = [
-      { sel: 'header h1', k: 'Welcome · 1 of 8', html: 'This page asks one question about flight logs: <b>can a fixed rule, reading the log alone, tell you which flights were already in trouble?</b> The numbers come from about sixteen hundred public PX4 flights, and every threshold was set on one half and reported on the other.' },
-      { sel: '#domain', k: 'The shape of it · 2 of 8', html: 'One flight becomes a handful of numbers, the numbers become a queue, and only at the very end does a human rating appear, to check whether the queue was in a useful order.' },
-      { sel: '#excard', k: 'One flight · 3 of 8', html: 'A real public flight, second by second. <b>Click the buttons above the charts</b> to move between a crash and a flight that came home. The table underneath shows what the rule read and which thresholds it crossed.' },
-      { sel: '#queuetable', k: 'The queue · 4 of 8', html: 'The same rule applied to every flight in the measured half, sorted so the most worrying sit at the top. <b>Click Reveal</b> to turn on the column showing what the pilot said, and check the order against it.' },
-      { sel: '#budgetcard', k: 'The trade · 5 of 8', html: 'Every rule can be made to catch more by flagging more. <b>Drag the slider</b> to change how many healthy flights you are willing to see flagged, and watch what the rule finds. The dots are the checks that already exist.' },
-      { sel: '#falsviz', k: 'The honest test · 6 of 8', html: 'Crashes the pilot blamed on themselves are the falsification group. If the rule flagged those as often as hardware failures, it would be reading bad endings rather than bad aircraft, and the page would say so.' },
-      { sel: '#cutblock', k: 'Hiding the ending · 7 of 8', html: 'Every flight here ends on the ground, and an impact writes vibration into the log whatever caused it. So the whole study runs a second time with the last seconds thrown away. What survives that is the real claim.' },
-      { sel: '#indtable', k: 'What fails · 8 of 8', html: 'Every indicator, including the ones that do not work. The weakest is named in the sentence below the table rather than dropped from it.' }
+      { sel: 'header h1', k: 'Welcome \u00b7 1 of 8', html: 'This page asks one question about flight logs: <b>can a fixed rule, reading the log alone, tell you which flights were already in trouble?</b> The numbers come from about sixteen hundred public PX4 flights, and every threshold was set on one half and reported on the other.' },
+      { sel: '#budgetcard', k: 'The answer \u00b7 2 of 8', html: 'The whole result in one chart. Up is crashes found, right is healthy flights wrongly flagged, so higher and further left is better. The two dots are the checks an operator already has. <b>Drag the slider</b> to trade one against the other and watch every line move.' },
+      { sel: '#domain', k: 'The shape of it \u00b7 3 of 8', html: 'One flight becomes a handful of numbers, the numbers become a queue, and only at the very end does a human rating appear, to check whether the queue was in a useful order.' },
+      { sel: '#excard', k: 'One flight \u00b7 4 of 8', html: 'A real public flight, second by second. <b>Click the buttons above the charts</b> to move between a crash and a flight that came home. The table underneath shows what the rule read and which thresholds it crossed.' },
+      { sel: '#queuetable', k: 'The queue \u00b7 5 of 8', html: 'The same rule applied to every flight in the measured half, sorted so the most worrying sit at the top. <b>Click Reveal</b> to turn on the column showing what the pilot said, and check the order against it.' },
+      { sel: '#falsviz', k: 'The honest test \u00b7 6 of 8', html: 'Crashes the pilot blamed on themselves are the falsification group. If the rule flagged those as often as hardware failures, it would be reading bad endings rather than bad aircraft, and the page would say so.' },
+      { sel: '#cutblock', k: 'Hiding the ending \u00b7 7 of 8', html: 'Every flight here ends on the ground, and an impact writes vibration into the log whatever caused it. So the whole study runs a second time with the last seconds thrown away. What survives that is the real claim.' },
+      { sel: '#indtable', k: 'What fails \u00b7 8 of 8', html: 'Every indicator, including the ones that do not work. The weakest is named in the sentence below the table rather than dropped from it.' }
     ];
     function place() {
       var st = STEPS[idx], elm = document.querySelector(st.sel);
@@ -623,6 +702,24 @@
     sl.value = i0;
     renderBudget(i0); renderFals(i0);
     sl.addEventListener('input', function () { renderBudget(+sl.value); renderFals(+sl.value); });
+
+    // Four charts draw a different layout below 620 px. Nothing redrew them when the
+    // width changed, so rotating a phone left the wide drawing scaled into a narrow
+    // column, which is how the labels ended up at three pixels in the first place.
+    var wasNarrow = window.innerWidth < 620, redrawTimer = null;
+    window.addEventListener('resize', function () {
+      var isNarrow = window.innerWidth < 620;
+      if (isNarrow === wasNarrow) return;
+      wasNarrow = isNarrow;
+      clearTimeout(redrawTimer);
+      redrawTimer = setTimeout(function () {
+        drawDomain();
+        renderExamples();
+        renderBudget(+sl.value);
+        renderFals(+sl.value);
+      }, 120);
+    });
+
     tour();
   });
 })();
