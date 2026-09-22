@@ -6,9 +6,8 @@ burying the reader in false alarms.
 
 Live page: https://bolgacg.github.io/flight-triage/
 
-Built for the engineer assistant position at SDU Drone Center (job 4209), around a gap the
-centre published about itself: in the compliance table of its 2026 Kenya operations paper,
-the safety objective on maintenance is marked not met, with the evaluation "No formal
+Built around a gap a 2026 drone operations paper published about itself: in its compliance
+table, the safety objective on maintenance is marked not met, with the evaluation "No formal
 maintenance structure exists. There are no documented maintenance instructions, no
 dedicated maintenance personnel, and no maintenance log or record-keeping system."
 The same campaign flew more than 260 flights and listed post-flight logging as one of the
@@ -62,6 +61,5 @@ would have said so.
   Conservation in Kenya", Drones 2026, 10(3), 178
 - Schultz Lundquist and others, "WildDrone: autonomous drone technology for monitoring
   wildlife populations", Frontiers in Robotics and AI 12, 2026
-- Job advertisement 4209, SDU Drone Center, read 20 August 2026
 
 Bolgaç Gülen, September 2026.
